@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { candidateProgress, conditionState, hasFamilyConflict, rumbleConditionsToComposition, supportVerdict, teamCost } from './engine'
+import { candidatePool, candidateProgress, conditionState, hasFamilyConflict, rumbleConditionsToComposition, supportVerdict, teamCost } from './engine'
 import type { CompositionCondition, Unit } from './types'
 
 const unit = (id: string, overrides: Partial<Unit> = {}): Unit => ({
@@ -8,6 +8,12 @@ const unit = (id: string, overrides: Partial<Unit> = {}): Unit => ({
 })
 
 describe('moteur public de composition', () => {
+  it('ouvre toute la base au Friend Captain, mais garde membres et supports dans la box', () => {
+    const units = { owned: unit('owned'), friend: unit('friend') }
+    expect(candidatePool('pve', 1, false, ['owned'], units).map(item => item.id)).toEqual(['owned', 'friend'])
+    expect(candidatePool('pve', 2, false, ['owned'], units).map(item => item.id)).toEqual(['owned'])
+    expect(candidatePool('pve', 0, true, ['owned'], units).map(item => item.id)).toEqual(['owned'])
+  })
   it('exclut le friend captain du coût PVE et inclut les supports', () => {
     const units = { a: unit('a'), b: unit('b', { cost: 50 }), s: unit('s', { cost: 7 }) }
     expect(teamCost({ type: 'pve', slots: ['a', 'b', null, null, null, null], supports: { 0: 's' } }, units)).toBe(27)

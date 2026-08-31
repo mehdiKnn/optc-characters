@@ -6,7 +6,7 @@ Spec d'implémentation, assemblée le 2026-08-31 depuis la [carte wayfinder](way
 
 App web **statique** de construction d'équipes One Piece Treasure Cruise : navigation/filtrage de la **box** du joueur façon optc-db, team builder **PVE** et **PVP** (Pirate Rumble), **compteurs** de **conditions de composition** auto-remplis, **recherche intelligente** par **conditions cochées**. UI en français, termes de jeu en anglais. Un seul utilisateur, données locales (localStorage), pas de backend.
 
-**Hors périmètre** ([carte](wayfinder/map.md), section Out of scope) : fiche détail d'un personnage ; effets du bateau dans les compteurs (affiché seulement) ; conditions temps réel PVP dans le filtre (affichées pour information) ; friend captain hors box ; Grand Party ; fallback d'images hors CDN ; export/import de la box.
+**Hors périmètre** ([carte](wayfinder/map.md), section Out of scope) : fiche détail d'un personnage ; effets du bateau dans les compteurs (affiché seulement) ; conditions temps réel PVP dans le filtre (affichées pour information) ; Grand Party ; fallback d'images hors CDN ; export/import de la box.
 
 ## 2. Stack et hébergement — [ticket 010](wayfinder/tickets/010-stack-et-pipeline.md)
 
@@ -68,7 +68,7 @@ Variante C du prototype ([team-builder-ui.html](wayfinder/prototype/team-builder
 
 ### 6.3 Règles du builder PVE — [ticket 006](wayfinder/tickets/006-spec-team-builder.md)
 
-- Structure : capitaine + friend captain + 4 membres ; **friend captain limité à la box** ; bateau choisi dans toute la base, affiché seulement.
+- Structure : capitaine + friend captain + 4 membres ; **friend captain choisi dans toute la base, sans devoir être possédé et sans support** ; bateau choisi dans toute la base, affiché seulement.
 - **Supports** : au plus 1 par personnage possédé (jamais sur le friend captain) → 5 max. Validateur **non bloquant** : cible non satisfaite → support plaçable, marqué « effet non applicable » (§8).
 - **Doublons interdits par famille** (`families.js`), tous emplacements confondus (équipage, friend captain, supports) ; conflit dès qu'une famille est partagée.
 - **Plafond de coût** : saisi par le joueur, mémorisé (un PVE, un PVP). Friend captain exclu, supports inclus. Dépassement **bloquant** à l'ajout ; une équipe sauvegardée dépassant un plafond abaissé reste sauvegardée, marquée en dépassement.
