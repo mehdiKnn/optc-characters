@@ -1,7 +1,11 @@
 import type { CompositionCondition, Id, PveTeam, PvpTeam, RumbleCondition, SupportTarget, SupportVerdict, TargetToken, Unit } from './types'
 
+export function isUnrestrictedFriendSelection(teamType: 'pve' | 'pvp', activeSlot: number, selectingSupport: boolean): boolean {
+  return teamType === 'pve' && activeSlot === 1 && !selectingSupport
+}
+
 export function candidatePool(teamType: 'pve' | 'pvp', activeSlot: number, selectingSupport: boolean, boxIds: Id[], units: Record<Id, Unit>): Unit[] {
-  if (teamType === 'pve' && activeSlot === 1 && !selectingSupport) return Object.values(units)
+  if (isUnrestrictedFriendSelection(teamType, activeSlot, selectingSupport)) return Object.values(units)
   return boxIds.map(id => units[id]).filter(Boolean)
 }
 

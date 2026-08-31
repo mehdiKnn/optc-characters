@@ -17,7 +17,7 @@ Grilling en 2 rounds, 14 décisions :
 2. **App web statique**, en exploitant optc-db (https://2shankz.github.io/optc-db.github.io/).
 3. **Box mise à jour par batch d'IDs** (input de l'app) ; aujourd'hui manuelle.
 4. **Équipe PVE** = 6 persos + supports + **bateau**.
-5. **Friend captain limité à la box.**
+5. ~~**Friend captain limité à la box.**~~ Décision remplacée le 2026-08-31 : le friend captain peut être choisi dans toute la base et ne reçoit jamais de support.
 6. **Persistance : localStorage** (+ export/import envisageable).
 7. **UI en français**, termes de jeu en anglais.
 8. **« EX » = toute condition de composition**, quelle que soit la section (Captain, Special, Super Special — ex. Saturn 4380 —, Sailor).
