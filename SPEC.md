@@ -98,6 +98,7 @@ Le cœur de l'app. Sources : PVE = conditions pré-parsées au build (grammaire 
 - **Aucune coche → navigateur normal** (recherche intelligente opt-in). Filtres classiques (type/classe/tags) en **intersection** avec les coches.
 - **Tri** : score = nb de positives actives que le candidat fait progresser, décroissant ; départage ID décroissant. Les négatives ne classent pas.
 - **Fusion des doublons** : même phrasé + même groupe + même seuil → une ligne, porteurs listés.
+- **Affichage compact** : chaque condition montre une synthèse structurée sur une ligne (seuil, cibles, régime) ; le texte source complet reste disponible au survol. Un même porteur n'est listé qu'une fois par condition fusionnée.
 
 ### Compteurs par famille de grammaire
 

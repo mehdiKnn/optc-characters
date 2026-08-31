@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { candidateProgress, conditionState, hasFamilyConflict, rumbleConditionsToComposition, supportVerdict, teamCost } from './engine'
+import { candidateProgress, conditionState, hasFamilyConflict, mergeConditions, rumbleConditionsToComposition, supportVerdict, teamCost } from './engine'
 import type { CompositionCondition, Unit } from './types'
 
 const unit = (id: string, overrides: Partial<Unit> = {}): Unit => ({
@@ -16,6 +16,11 @@ describe('moteur public de composition', () => {
   it('détecte un doublon dès qu’une famille est partagée', () => {
     expect(hasFamilyConflict(unit('a', { families: ['Luffy'] }), [unit('b', { families: ['Luffy', 'Gear 5'] })])).toBe(true)
     expect(hasFamilyConflict(unit('a', { families: ['Luffy'] }), [unit('a', { families: ['Luffy'] })])).toBe(true)
+  })
+
+  it('ne répète pas le même porteur pour une condition fusionnée', () => {
+    const condition: CompositionCondition = { family: 'member', section: 'special', comparator: 'present', targets: [{ kind: 'name', value: 'Zoro' }], original: 'Zoro required', checkable: true }
+    expect(mergeConditions([unit('a', { conditions: [condition, condition] })])[0].carriers).toEqual(['Unit a'])
   })
 
   it('compte une condition sur l’union des cibles', () => {

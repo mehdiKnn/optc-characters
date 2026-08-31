@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Box, Check, ChevronLeft, Copy, Plus, Save, Search, Shield, ShipWheel, Swords, Trash2, Users, X } from 'lucide-react'
 import rawData from './generated/index.json'
 import { addMergedCondition, candidateProgress, conditionState, hasFamilyConflict, matchesModifier, mergeConditions, rumbleConditionsToComposition, supportVerdict, teamCost, type MergedCondition } from './domain/engine'
+import { conditionSectionLabel, conditionSummary } from './domain/conditionPresentation'
 import { createTeam, storage } from './domain/storage'
 import type { CompositionCondition, CostCaps, DataIndex, Id, PveTeam, PvpModifier, PvpTeam, Team, Unit } from './domain/types'
 
@@ -160,7 +161,7 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
         const baseState = stateForEntry(item)
         const captainMatchesCarrier = team.slots[0] ? item.carriers.includes(data.units[team.slots[0]].name) : false
         const state = item.condition.family === 'captain' ? { current: captainMatchesCarrier ? 1 : 0, target: 1, done: captainMatchesCarrier, label: captainMatchesCarrier ? '✓' : '✗' } : baseState
-        return <label className={`condition ${state.done ? 'done' : ''} ${!item.condition.checkable ? 'raw' : ''}`} key={item.key}>{item.condition.checkable ? <input type="checkbox" checked={team.checkedConditions.includes(item.key)} onChange={() => toggleCondition(item.key)} /> : <span className="info-dot">i</span>}<span><small>{item.condition.section || 'Rumble'} · {item.carriers.join(', ')}</small><b>{item.condition.original}</b></span><em>{state.done ? <Check size={14} /> : state.label}</em></label>
+        return <label className={`condition ${state.done ? 'done' : ''} ${!item.condition.checkable ? 'raw' : ''}`} key={item.key}>{item.condition.checkable ? <input type="checkbox" checked={team.checkedConditions.includes(item.key)} onChange={() => toggleCondition(item.key)} /> : <span className="info-dot">i</span>}<span><small>{conditionSectionLabel(item.condition.section)} · {item.carriers.join(', ')}</small><b title={item.condition.original} aria-label={item.condition.original}>{conditionSummary(item.condition)}</b></span><em>{state.done ? <Check size={14} /> : state.label}</em></label>
       })}</div> : <Empty title="Aucune condition détectée" body="Ajoutez un porteur de condition à l’équipe pour alimenter ce panneau." />}{team.type === 'pvp' && <Modifiers team={team} onChange={onChange} />}</aside>
       <section className="candidate-panel"><div className="candidate-title"><div><p className="panel-title">Candidats de ma box</p><h2>{supportFor !== null ? `Support pour ${data.units[team.slots[supportFor]!]?.name}` : `Slot ${activeSlot + 1}`}</h2></div>{checked.length > 0 && <span className="smart-chip">Recherche intelligente active</span>}</div><Filters query={query} onQuery={setQuery} type={type} onType={setType} unitClass={unitClass} onClass={setUnitClass} tag={tag} onTag={setTag} /><p className="result-count">{scored.length} candidats · le score indique les conditions progressées</p><CharacterGrid units={scored.map(item => item.unit)} scores={scores} beneficiaries={modifierBeneficiaries} onSelect={select} /></section>
     </div>

@@ -19,8 +19,9 @@ export type MergedCondition = { key: string; condition: CompositionCondition; ca
 export function addMergedCondition(merged: Map<string, MergedCondition>, condition: CompositionCondition, carrier: string): void {
   const key = conditionKey(condition)
   const current = merged.get(key)
-  if (current) current.carriers.push(carrier)
-  else merged.set(key, { key, condition, carriers: [carrier] })
+  if (current) {
+    if (!current.carriers.includes(carrier)) current.carriers.push(carrier)
+  } else merged.set(key, { key, condition, carriers: [carrier] })
 }
 
 export function mergeConditions(units: Unit[]): MergedCondition[] {
