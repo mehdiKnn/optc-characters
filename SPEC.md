@@ -70,7 +70,7 @@ Variante C du prototype ([team-builder-ui.html](wayfinder/prototype/team-builder
 
 - Structure : capitaine + friend captain + 4 membres ; **friend captain limité à la box** ; bateau choisi dans toute la base, affiché seulement.
 - **Supports** : au plus 1 par personnage possédé (jamais sur le friend captain) → 5 max. Validateur **non bloquant** : cible non satisfaite → support plaçable, marqué « effet non applicable » (§8).
-- **Doublons interdits par famille** (`families.js`), tous emplacements confondus (équipage, friend captain, supports) ; conflit dès qu'une famille est partagée.
+- **Doublons interdits par famille** (`families.js`), tous emplacements confondus (équipage, friend captain, supports) ; conflit dès qu'une famille est partagée. Exception : le capitaine et le friend captain peuvent utiliser exactement la même unité (même ID).
 - **Plafond de coût** : saisi par le joueur, mémorisé (un PVE, un PVP). Friend captain exclu, supports inclus. Dépassement **bloquant** à l'ajout ; une équipe sauvegardée dépassant un plafond abaissé reste sauvegardée, marquée en dépassement.
 - **Compteurs évalués sur les 6 membres d'équipage** (friend captain inclus, supports exclus) — exception : condition « membre nommé », satisfaite aussi par le support du porteur (§7).
 

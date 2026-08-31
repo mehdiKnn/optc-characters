@@ -126,15 +126,20 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
     return conditionState(item.condition, crew, item.condition.family === 'member' ? carrierSupports : supports, team.slots[0] ? data.units[team.slots[0]] : undefined)
   }
   const checked = checkedEntries.filter(item => item.condition.negative || item.condition.comparator === 'exact' || !stateForEntry(item).done).map(item => item.condition)
-  const occupants = [...crew, ...supports]
   const currentCost = teamCost(team, data.units)
   const modifierBeneficiaries = new Set<Id>(team.type === 'pvp' ? boxIds.filter(id => team.modifiers.some(modifier => matchesModifier(data.units[id], modifier.targetKind, modifier.target))) : [])
   const scored = boxIds.map(id => data.units[id]).filter(Boolean).filter(unit => !query || `${unit.id} ${unit.name}`.toLowerCase().includes(query.toLowerCase())).filter(unit => !type || unit.types.includes(type)).filter(unit => !unitClass || unit.classes.includes(unitClass)).filter(unit => !tag || unit.tags.includes(tag)).map(unit => ({ unit, ...candidateProgress(unit, crew, checked) })).filter(item => !item.violates && (!checked.some(condition => !condition.negative && !conditionState(condition, crew).done) || item.score > 0)).sort((a, b) => b.score - a.score || byDescendingId(a.unit, b.unit))
   const scores = new Map(scored.map(item => [item.unit.id, item.score]))
 
   const select = (unit: Unit) => {
-    const replacedId = team.type === 'pve' && supportFor !== null ? team.supports[supportFor] : team.slots[activeSlot]
-    const otherOccupants = occupants.filter(occupant => occupant.id !== replacedId)
+    const selectingSupport = team.type === 'pve' && supportFor !== null
+    const otherCrew = team.slots.flatMap((id, index) => {
+      if (!id || (!selectingSupport && index === activeSlot)) return []
+      const isCaptainFriendPair = team.type === 'pve' && !selectingSupport && ((activeSlot === 0 && index === 1) || (activeSlot === 1 && index === 0))
+      return isCaptainFriendPair && id === unit.id ? [] : [data.units[id]]
+    })
+    const otherSupports = team.type === 'pve' ? Object.entries(team.supports).flatMap(([index, id]) => selectingSupport && Number(index) === supportFor ? [] : [data.units[id]]) : []
+    const otherOccupants = [...otherCrew, ...otherSupports]
     if (hasFamilyConflict(unit, otherOccupants)) return alert('Doublon interdit : ce personnage partage une famille avec un membre ou support déjà placé.')
     if (team.type === 'pve' && supportFor !== null) {
       const next = { ...team, supports: { ...team.supports, [supportFor]: unit.id } }
