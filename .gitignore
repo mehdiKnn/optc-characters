@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.cache/
+src/generated/
+.DS_Store
+.playwright-mcp/
+coverage/
+*.log
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts

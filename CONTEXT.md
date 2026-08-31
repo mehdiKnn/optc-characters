@@ -1,0 +1,27 @@
+# CONTEXT — Glossaire du domaine
+
+Termes canoniques du projet « plateforme d'équipes OPTC ». UI en français, termes de jeu en anglais.
+
+- **Box** : la liste des IDs de personnages que le joueur possède. Ce n'est plus le dossier de fichiers markdown (artefact d'amorçage) — c'est une liste d'IDs sur la base optc-db complète.
+- **Base optc-db** : la base de données complète des personnages du jeu, issue du repo optc-db (fork 2shankz). Source de vérité des données de personnages et bateaux.
+- **Fiche** : les données complètes d'un personnage (type, classes, tags, capacités…).
+- **Condition de composition** : un prédicat sur la composition de l'équipe porté par une capacité, de la forme « If your crew has N(+/or more/or fewer) X characters ». Peut vivre dans Captain Ability, Special, Super Special (« EX », ex. Saturn 4380), Sailor. C'est la seule famille de conditions que le moteur trace.
+- **Condition temps réel** : condition dépendant de l'état du combat (HP, secondes restantes, buffs). Affichée pour information, jamais tracée ni filtrée.
+- **Compteur** : l'état d'avancement d'une condition de composition pour l'équipe en cours (ex. « Slasher 2/3 »), recalculé à chaque ajout/retrait de personnage.
+- **Condition cochée** : une condition de composition que l'utilisateur a marquée comme « à remplir ». Seules les conditions cochées filtrent et trient les candidats, selon leur régime (positive ou négative).
+- **Condition positive** : condition de composition qu'un ajout de personnage peut faire progresser (seuil, roster nommé, arc-en-ciel, scaler continu, membre nommé). Cochée, elle promeut les candidats qui la font progresser.
+- **Condition négative** : condition de composition qui contraint l'équipe (« or fewer », « only », absence, compte exact atteint). Cochée, elle exclut les candidats qui la violeraient ; elle ne promeut ni ne classe.
+- **Condition active** : condition positive cochée non encore remplie. Une condition remplie reste cochée et affichée ✓ mais cesse de piloter le filtre.
+- **Candidat** : un personnage de la box affichable dans la liste de sélection pendant la construction d'une équipe. La recherche intelligente montre les candidats faisant progresser au moins une condition active (quand il en existe) et ne violant aucune condition négative cochée ; ils sont triés par nombre de conditions actives qu'ils font progresser.
+- **Équipe PVE** : 2 capitaines (dont friend captain, limité à la box) + 4 membres + supports + bateau (affiché, effets non simulés). Au plus 1 support par personnage possédé (capitaine et 4 membres) — soit 5 supports max ; le friend captain n'en reçoit jamais.
+- **Doublon** : deux unités représentant le même personnage du lore (ex. deux Luffy, même sous des IDs différents). Interdit au sein d'une même équipe, tous emplacements confondus (équipage, friend captain, supports).
+- **Bateaux possédés** : sous-ensemble des bateaux de la base optc-db que le joueur marque comme possédés. Fait partie de la box au même titre que les personnages. La possession est informative : une équipe peut embarquer n'importe quel bateau de la base.
+- **Plafond de coût** : valeur saisie par le joueur (elle dépend de son compte), mémorisée — une pour le PVE, une pour le PVP. Le dépassement est bloquant. En PVE le friend captain est exclu du total et les supports inclus ; en PVP le total est la somme des costs Rumble des 8 membres.
+- **Mode PVP** : drapeau porté par une équipe PVP — Rumble normal ou Assault Rumble. Même structure d'équipe ; seuls certains effets sont conditionnés au mode.
+- **Cible de support** : la clause (texte libre dans les données) désignant qui un support peut soutenir. Seule chose que le validateur de supports évalue : un support dont le personnage soutenu ne satisfait pas la cible reste plaçable, marqué « effet non applicable ».
+- **Équipe PVP** : jusqu'à 8 personnages à plat, sans capitaine, sans supports, sans banc. Porte un mode PVP et une liste de modificateurs PVP.
+- **Modificateur PVP** : bonus de saison saisi manuellement sur une équipe PVP (absent des données optc-db) — une cible (type, classe, classe Rumble, famille ou tag) + des multiplicateurs de stats Rumble (HP, ATK, RCV, DEF, SPD). L'app indique quels membres en bénéficient et met en avant les candidats bénéficiaires ; elle ne calcule pas de stats ajustées (les stats réelles de la box sont inconnues).
+- **Batch-add** : l'ajout de personnages à la box via un input à jetons unique : taper un ID puis espace l'élit en jeton ; un collage est découpé de la même façon (tout non-chiffre sépare). Un bouton ajoute à la box les jetons valides et les suggestions acceptées (acceptation partielle — les jetons invalides n'empêchent rien).
+- **Jeton** : un ID élu dans l'input de batch-add, validé immédiatement contre la base optc-db : connu (affiche le nom du personnage) ou inconnu (en erreur, avec éventuelle suggestion du check +1).
+- **Check +1** : sur un ID inconnu seulement, l'app teste ID+1 ; s'il existe (souvent la forme évoluée), elle le propose avec son nom — validation manuelle obligatoire avant entrée en box. Si ID+1 est aussi inconnu, le jeton reste inconnu sans suggestion.
+- **Seed de migration** : liste jetable des 381 IDs actuels (extraite d'`index.json`), embarquée au build ; au premier lancement, une box vide (localStorage vide) se remplit depuis ce seed.
