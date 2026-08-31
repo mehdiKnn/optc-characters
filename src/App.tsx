@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Box, Check, ChevronLeft, Copy, Plus, Save, Search, Shield, ShipWheel, Swords, Trash2, Users, X } from 'lucide-react'
 import rawData from './generated/index.json'
-import { candidateProgress, conditionKey, conditionState, hasFamilyConflict, matchesModifier, mergeConditions, rumbleConditionsToComposition, supportVerdict, teamCost } from './domain/engine'
+import { addMergedCondition, candidateProgress, conditionState, hasFamilyConflict, matchesModifier, mergeConditions, rumbleConditionsToComposition, supportVerdict, teamCost, type MergedCondition } from './domain/engine'
 import { createTeam, storage } from './domain/storage'
 import type { CompositionCondition, CostCaps, DataIndex, Id, PveTeam, PvpModifier, PvpTeam, Team, Unit } from './domain/types'
 
@@ -120,11 +120,16 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
   const crew = team.slots.flatMap(id => id ? [data.units[id]] : [])
   const supports = team.type === 'pve' ? Object.values(team.supports).map(id => data.units[id]).filter(Boolean) : []
   const conditions = useMemo(() => team.type === 'pve' ? mergeConditions(crew) : mergeRumbleConditions(crew), [team, crew])
-  const checked = conditions.filter(item => team.checkedConditions.includes(item.key)).map(item => item.condition)
+  const checkedEntries = conditions.filter(item => team.checkedConditions.includes(item.key))
+  const stateForEntry = (item: MergedCondition) => {
+    const carrierSupports = team.type === 'pve' ? team.slots.flatMap((id, index) => id && item.carriers.includes(data.units[id].name) && team.supports[index] ? [data.units[team.supports[index]]] : []) : []
+    return conditionState(item.condition, crew, item.condition.family === 'member' ? carrierSupports : supports, team.slots[0] ? data.units[team.slots[0]] : undefined)
+  }
+  const checked = checkedEntries.filter(item => item.condition.negative || item.condition.comparator === 'exact' || !stateForEntry(item).done).map(item => item.condition)
   const occupants = [...crew, ...supports]
   const currentCost = teamCost(team, data.units)
   const modifierBeneficiaries = new Set<Id>(team.type === 'pvp' ? boxIds.filter(id => team.modifiers.some(modifier => matchesModifier(data.units[id], modifier.targetKind, modifier.target))) : [])
-  const scored = useMemo(() => boxIds.map(id => data.units[id]).filter(Boolean).filter(unit => !query || `${unit.id} ${unit.name}`.toLowerCase().includes(query.toLowerCase())).filter(unit => !type || unit.types.includes(type)).filter(unit => !unitClass || unit.classes.includes(unitClass)).filter(unit => !tag || unit.tags.includes(tag)).map(unit => ({ unit, ...candidateProgress(unit, crew, checked) })).filter(item => !item.violates && (!checked.some(condition => !condition.negative && !conditionState(condition, crew).done) || item.score > 0)).sort((a, b) => b.score - a.score || byDescendingId(a.unit, b.unit)), [boxIds, query, type, unitClass, tag, crew, checked])
+  const scored = boxIds.map(id => data.units[id]).filter(Boolean).filter(unit => !query || `${unit.id} ${unit.name}`.toLowerCase().includes(query.toLowerCase())).filter(unit => !type || unit.types.includes(type)).filter(unit => !unitClass || unit.classes.includes(unitClass)).filter(unit => !tag || unit.tags.includes(tag)).map(unit => ({ unit, ...candidateProgress(unit, crew, checked) })).filter(item => !item.violates && (!checked.some(condition => !condition.negative && !conditionState(condition, crew).done) || item.score > 0)).sort((a, b) => b.score - a.score || byDescendingId(a.unit, b.unit))
   const scores = new Map(scored.map(item => [item.unit.id, item.score]))
 
   const select = (unit: Unit) => {
@@ -147,8 +152,7 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
     <div className="builder-head"><button className="back" onClick={onBack}><ChevronLeft size={18} /> Équipes</button><input aria-label="Nom de l’équipe" value={team.name} onChange={event => onChange({ ...team, name: event.target.value })} /><span className={`mode-label ${team.type}`}>{team.type === 'pve' ? 'PVE' : 'PIRATE RUMBLE'}</span>{team.type === 'pvp' && <select value={team.mode} onChange={event => onChange({ ...team, mode: event.target.value as PvpTeam['mode'] })}><option value="normal">Rumble normal</option><option value="assault">Assault Rumble</option></select>}<span className={`cost-head ${currentCost > cap ? 'over' : ''}`}>{currentCost} / {cap}</span><span className="saved"><Save size={14} /> Sauvegardé localement</span></div>
     <div className="builder-workspace">
       <aside className="conditions-panel"><p className="panel-title">Conditions de composition</p><h2>Priorités de recherche</h2><p className="panel-help">Cochez les conditions à remplir. Les candidats sont filtrés et classés automatiquement.</p>{conditions.length ? <div className="condition-list">{conditions.map(item => {
-        const carrierSupports = team.type === 'pve' ? team.slots.flatMap((id, index) => id && item.carriers.includes(data.units[id].name) && team.supports[index] ? [data.units[team.supports[index]]] : []) : []
-        const baseState = conditionState(item.condition, crew, item.condition.family === 'member' ? carrierSupports : supports, team.slots[0] ? data.units[team.slots[0]] : undefined)
+        const baseState = stateForEntry(item)
         const captainMatchesCarrier = team.slots[0] ? item.carriers.includes(data.units[team.slots[0]].name) : false
         const state = item.condition.family === 'captain' ? { current: captainMatchesCarrier ? 1 : 0, target: 1, done: captainMatchesCarrier, label: captainMatchesCarrier ? '✓' : '✗' } : baseState
         return <label className={`condition ${state.done ? 'done' : ''} ${!item.condition.checkable ? 'raw' : ''}`} key={item.key}>{item.condition.checkable ? <input type="checkbox" checked={team.checkedConditions.includes(item.key)} onChange={() => toggleCondition(item.key)} /> : <span className="info-dot">i</span>}<span><small>{item.condition.section || 'Rumble'} · {item.carriers.join(', ')}</small><b>{item.condition.original}</b></span><em>{state.done ? <Check size={14} /> : state.label}</em></label>
@@ -160,13 +164,11 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
 }
 
 function mergeRumbleConditions(crew: Unit[]) {
-  const map = new Map<string, { key: string; condition: CompositionCondition; carriers: string[] }>()
+  const map = new Map<string, MergedCondition>()
   for (const unit of crew) for (const raw of unit.rumble?.conditions || []) {
     const parsed = rumbleConditionsToComposition(raw)
     const conditions = parsed.length ? parsed : [{ family: 'raw', section: 'Rumble', comparator: 'info', targets: [], original: raw.original, checkable: false } as CompositionCondition]
-    for (const condition of conditions) {
-      const key = conditionKey(condition); const current = map.get(key); if (current) current.carriers.push(unit.name); else map.set(key, { key, condition, carriers: [unit.name] })
-    }
+    for (const condition of conditions) addMergedCondition(map, condition, unit.name)
   }
   return [...map.values()]
 }

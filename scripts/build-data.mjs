@@ -126,5 +126,6 @@ await fs.mkdir(outDir, { recursive: true })
 await fs.writeFile(path.join(outDir, 'index.json'), JSON.stringify(index))
 console.log(`Index généré: ${Object.keys(generatedUnits).length} unités, ${ships.length} bateaux, seed ${seed.length} IDs.`)
 console.warn(`Couverture informative: conditions ${parsedConditions} parsées / ${rawConditions} fallback; supports ${parsedSupports} parsés / ${rawSupports} fallback.`)
-if (parsedConditions < 2083) console.warn(`AVERTISSEMENT couverture conditions: ${parsedConditions} < baseline 2083 (rapport cover4).`)
-if (parsedSupports < 2259) console.warn(`AVERTISSEMENT couverture supports: ${parsedSupports} < baseline 2259 (rapport cover11).`)
+const COVERAGE_BASELINES = { conditions: 2083, supports: 2259 } // Corpus documentés dans wayfinder/research/004 et 011.
+if (parsedConditions < COVERAGE_BASELINES.conditions) console.warn(`AVERTISSEMENT couverture conditions: ${parsedConditions} < baseline ${COVERAGE_BASELINES.conditions} (rapport cover4).`)
+if (parsedSupports < COVERAGE_BASELINES.supports) console.warn(`AVERTISSEMENT couverture supports: ${parsedSupports} < baseline ${COVERAGE_BASELINES.supports} (rapport cover11).`)

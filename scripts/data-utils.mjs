@@ -93,6 +93,11 @@ export function parseCompositionCondition(text, section, knownTags = []) {
   if (scaler) return { family: 'scaler', section, comparator: 'scale', targets: tokenizeGroup(scaler[1], knownTags), original, checkable: true }
   const absence = original.match(/there are no (.+?) characters? (?:on|in)/i)
   if (absence) return { family: 'threshold', section, count: 0, comparator: 'exact', targets: tokenizeGroup(absence[1], knownTags), original, checkable: true, negative: true }
+  const rainbowPresence = original.match(/If there (?:is|are) (.+?) characters? (?:on|in) (?:the|your) crew/i)
+  if (rainbowPresence) {
+    const targets = tokenizeGroup(rainbowPresence[1], knownTags).filter(token => token.kind === 'type' && ['STR', 'DEX', 'QCK', 'PSY', 'INT'].includes(token.value))
+    if (targets.length === 5) return { family: 'rainbow', section, comparator: 'each', targets, original, checkable: true }
+  }
   const presence = original.match(/If (?:there(?:'s| is| are)|you have) (?:an? )?(.+?) characters? (?:on|in) (?:the|your) crew/i)
   if (presence) return { family: 'threshold', section, count: 1, comparator: 'more', targets: tokenizeGroup(presence[1], knownTags), original, checkable: true }
   const only = original.match(/crew has only (.+?) characters?/i)

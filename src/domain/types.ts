@@ -1,28 +1,43 @@
 export type Id = string
 export type TeamType = 'pve' | 'pvp'
 export type TokenKind = 'type' | 'class' | 'tag' | 'name'
+export type ConditionComparator = 'captain' | 'present' | 'more' | 'less' | 'exact' | 'only' | 'each' | 'scale' | 'info'
+export type SupportRule = 'S1' | 'S2' | 'S3' | 'S4' | 'S5' | 'S6'
 
 export interface TargetToken { kind: TokenKind; value: string }
 export interface CompositionCondition {
-  family: 'threshold' | 'roster' | 'rainbow' | 'scaler' | 'member' | 'captain' | 'raw'
+  family: 'threshold' | 'roster' | 'rainbow' | 'scaler' | 'member' | 'captain' | 'multi' | 'raw'
   section: string
   count?: number
   alternateCount?: number
-  comparator: string
+  comparator: ConditionComparator
   targets: TargetToken[]
   original: string
   checkable: boolean
   negative?: boolean
+  conjunction?: 'and' | 'or'
+  branches?: CompositionCondition[]
 }
 export interface SupportTarget {
-  rule?: string
+  rule?: SupportRule
   groups?: TargetToken[][]
   names?: { names: string[]; tokens: TargetToken[] }[]
   cost?: number
   comparator?: string
   original: string
 }
-export interface RumbleCondition extends Record<string, unknown> { type: string; checkable: boolean; original: string }
+export interface RumbleCondition {
+  type: 'crew' | 'character' | 'multi' | 'mode' | 'time' | 'stat' | 'enemies' | 'trigger' | 'specialreceived' | 'dmgreceived' | 'dbfreceived' | 'heal' | 'debuff'
+  checkable: boolean
+  original: string
+  comparator?: string
+  conjunction?: string
+  count?: number
+  targets?: unknown[]
+  families?: unknown[]
+  conditions?: RumbleCondition[]
+  [key: string]: unknown
+}
 export interface Unit {
   id: Id
   name: string

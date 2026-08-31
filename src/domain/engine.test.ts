@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { candidateProgress, conditionState, hasFamilyConflict, supportVerdict, teamCost } from './engine'
+import { candidateProgress, conditionState, hasFamilyConflict, rumbleConditionsToComposition, supportVerdict, teamCost } from './engine'
 import type { CompositionCondition, Unit } from './types'
 
 const unit = (id: string, overrides: Partial<Unit> = {}): Unit => ({
@@ -39,5 +39,14 @@ describe('moteur public de composition', () => {
 
   it('rend indéterminée une cible de support taggée sur une unité sans tags', () => {
     expect(supportVerdict({ rule: 'S2', groups: [[{ kind: 'tag', value: 'Navy' }]], original: '[Navy] characters' }, unit('x', { tags: [] }))).toBe('indeterminate')
+  })
+
+  it('conserve une condition Rumble multi comme un seul prédicat OR', () => {
+    const [multi] = rumbleConditionsToComposition({ type: 'multi', checkable: true, original: '6 Cerebral ou 5 Vegapunk', conjunction: 'or', conditions: [
+      { type: 'crew', checkable: true, original: '6 Cerebral', comparator: 'more', count: 6, targets: ['Cerebral'] },
+      { type: 'crew', checkable: true, original: '5 Vegapunk', comparator: 'more', count: 5, targets: ['[Vegapunk]'] },
+    ] })
+    expect(multi).toMatchObject({ family: 'multi', conjunction: 'or', checkable: true })
+    expect(multi.branches).toHaveLength(2)
   })
 })

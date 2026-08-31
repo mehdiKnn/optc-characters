@@ -15,20 +15,29 @@ export function conditionKey(condition: CompositionCondition): string {
   return JSON.stringify([condition.family, condition.original, condition.count, condition.comparator, condition.targets])
 }
 
-export function mergeConditions(units: Unit[]): { key: string; condition: CompositionCondition; carriers: string[] }[] {
-  const merged = new Map<string, { key: string; condition: CompositionCondition; carriers: string[] }>()
-  for (const unit of units) for (const condition of unit.conditions) {
-    const key = conditionKey(condition)
-    const current = merged.get(key)
-    if (current) current.carriers.push(unit.name)
-    else merged.set(key, { key, condition, carriers: [unit.name] })
-  }
+export type MergedCondition = { key: string; condition: CompositionCondition; carriers: string[] }
+export function addMergedCondition(merged: Map<string, MergedCondition>, condition: CompositionCondition, carrier: string): void {
+  const key = conditionKey(condition)
+  const current = merged.get(key)
+  if (current) current.carriers.push(carrier)
+  else merged.set(key, { key, condition, carriers: [carrier] })
+}
+
+export function mergeConditions(units: Unit[]): MergedCondition[] {
+  const merged = new Map<string, MergedCondition>()
+  for (const unit of units) for (const condition of unit.conditions) addMergedCondition(merged, condition, unit.name)
   return [...merged.values()]
 }
 
 export interface ConditionState { current: number; target?: number; done: boolean; label: string }
 
 export function conditionState(condition: CompositionCondition, crew: Unit[], supports: Unit[] = [], captain?: Unit): ConditionState {
+  if (condition.family === 'multi') {
+    const branches = (condition.branches || []).map(branch => conditionState(branch, crew, supports, captain))
+    const doneCount = branches.filter(branch => branch.done).length
+    const done = condition.conjunction === 'and' ? branches.length > 0 && doneCount === branches.length : branches.some(branch => branch.done)
+    return { current: doneCount, target: branches.length, done, label: `${condition.conjunction?.toUpperCase()} ${doneCount}/${branches.length}` }
+  }
   if (condition.family === 'captain') {
     const done = Boolean(captain)
     return { current: done ? 1 : 0, target: 1, done, label: done ? '✓' : '✗' }
@@ -53,6 +62,13 @@ export function candidateProgress(candidate: Unit, crew: Unit[], checked: Compos
   let score = 0
   let violates = false
   for (const condition of checked) {
+    if (condition.family === 'multi') {
+      if (conditionState(condition, crew).done) continue
+      const branchResult = candidateProgress(candidate, crew, condition.branches || [])
+      if (branchResult.violates) violates = true
+      if (branchResult.score > 0) score += 1
+      continue
+    }
     if (condition.comparator === 'exact') {
       const before = conditionState(condition, crew)
       if (before.done && matchesAny(candidate, condition.targets)) violates = true
@@ -124,10 +140,7 @@ export function rumbleConditionsToComposition(condition: RumbleCondition): Compo
   const direct = rumbleConditionToComposition(condition)
   if (direct) return [direct]
   if (condition.type !== 'multi' || !Array.isArray(condition.conditions)) return []
-  const children = condition.conditions.flatMap(child => rumbleConditionsToComposition({ ...(child as RumbleCondition), checkable: true, original: condition.original }))
-  if (condition.conjunction === 'or' && children.length > 1 && children.every(child => child.family === 'threshold' && child.count === children[0].count && child.comparator === children[0].comparator)) {
-    const targets = [...new Map(children.flatMap(child => child.targets).map(token => [`${token.kind}:${token.value}`, token])).values()]
-    return [{ ...children[0], targets, original: condition.original }]
-  }
-  return children.map(child => ({ ...child, original: `${condition.original} · ${child.original}` }))
+  const branches = condition.conditions.flatMap(child => rumbleConditionsToComposition({ ...child, checkable: true, original: child.original || condition.original }))
+  if (!branches.length) return []
+  return [{ family: 'multi', section: 'Rumble', comparator: 'info', targets: [], original: condition.original, checkable: true, conjunction: condition.conjunction === 'and' ? 'and' : 'or', branches }]
 }
