@@ -9,6 +9,7 @@
     "data:update": "node scripts/update-data.mjs",
     "prebuild": "npm run data:build",
     "build": "tsc -b && vite build",
+    "pretest": "npm run data:build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
