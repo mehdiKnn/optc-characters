@@ -64,9 +64,9 @@ export function candidateProgress(candidate: Unit, crew: Unit[], checked: Compos
   for (const condition of checked) {
     if (condition.family === 'multi') {
       if (conditionState(condition, crew).done) continue
-      const branchResult = candidateProgress(candidate, crew, condition.branches || [])
-      if (branchResult.violates) violates = true
-      if (branchResult.score > 0) score += 1
+      const branchResults = (condition.branches || []).map(branch => candidateProgress(candidate, crew, [branch]))
+      if (condition.conjunction === 'and' ? branchResults.some(result => result.violates) : branchResults.length > 0 && branchResults.every(result => result.violates)) violates = true
+      if (branchResults.some(result => result.score > 0)) score += 1
       continue
     }
     if (condition.comparator === 'exact') {
@@ -128,9 +128,9 @@ export function matchesModifier(unit: Unit, kind: string, target: string): boole
 export function rumbleConditionToComposition(condition: RumbleCondition): CompositionCondition | null {
   if (!condition.checkable) return null
   if (condition.type === 'crew') return {
-    family: 'threshold', section: 'Rumble', count: Number(condition.count ?? 1), comparator: condition.comparator === 'less' ? 'less' : 'more',
+    family: 'threshold', section: 'Rumble', count: Number(condition.count ?? 1), comparator: ['exact', 'exactly', 'equal'].includes(condition.comparator || '') ? 'exact' : ['less', 'fewer'].includes(condition.comparator || '') ? 'less' : 'more',
     targets: (Array.isArray(condition.targets) ? condition.targets : []).map(value => { const stringValue = String(value); return { kind: stringValue.startsWith('[') ? (['STR', 'DEX', 'QCK', 'PSY', 'INT'].includes(stringValue.slice(1, -1)) ? 'type' : 'tag') : 'class', value: stringValue.replace(/^\[|\]$/g, '') } as TargetToken }),
-    original: condition.original, checkable: true, negative: condition.comparator === 'less',
+    original: condition.original, checkable: true, negative: ['less', 'fewer'].includes(condition.comparator || ''),
   }
   if (condition.type === 'character') return { family: 'member', section: 'Rumble', comparator: 'present', targets: (Array.isArray(condition.families) ? condition.families : []).map(value => ({ kind: 'name', value: String(value) })), original: condition.original, checkable: true }
   return null

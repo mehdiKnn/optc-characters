@@ -20,8 +20,8 @@ describe('harnais cover4 — grammaire des conditions', () => {
   it.each(cases)('%s reste structuré', (_rule, text) => {
     expect(parseCompositionCondition(text, 'test', tags)?.family).not.toBe('raw')
   })
-  it('reconnaît un arc-en-ciel comme cinq cases distinctes', () => {
-    const parsed = parseCompositionCondition('If there is a [STR], [DEX], [QCK], [PSY] and [INT] character in your crew', 'test', tags)
+  it.each(['If there is', "If there's"])('reconnaît un arc-en-ciel « %s » comme cinq cases distinctes', prefix => {
+    const parsed = parseCompositionCondition(`${prefix} a [STR], [DEX], [QCK], [PSY] and [INT] character in your crew`, 'test', tags)
     expect(parsed).toMatchObject({ family: 'rainbow', comparator: 'each' })
     expect(parsed.targets).toHaveLength(5)
   })

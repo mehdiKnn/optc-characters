@@ -49,4 +49,12 @@ describe('moteur public de composition', () => {
     expect(multi).toMatchObject({ family: 'multi', conjunction: 'or', checkable: true })
     expect(multi.branches).toHaveLength(2)
   })
+
+  it('préserve une branche Rumble exactly comme compte exact', () => {
+    const [multi] = rumbleConditionsToComposition({ type: 'multi', checkable: true, original: 'sans Giant et 5 STR', conjunction: 'and', conditions: [
+      { type: 'crew', checkable: true, original: 'aucun Giant', comparator: 'exactly', count: 0, targets: ['[Giant]'] },
+      { type: 'crew', checkable: true, original: '5 STR', comparator: 'more', count: 5, targets: ['[STR]'] },
+    ] })
+    expect(multi.branches?.[0]).toMatchObject({ comparator: 'exact', count: 0 })
+  })
 })
