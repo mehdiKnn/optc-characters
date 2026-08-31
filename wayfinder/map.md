@@ -28,7 +28,7 @@ Une **spec complète et prête à implémenter** pour la plateforme d'équipes O
 - [Structure d'une équipe PVP (Pirate Rumble)](tickets/003-structure-equipe-pvp.md) — équipe = jusqu'à 8 persos, sans capitaine/supports/banc ; kit Rumble distinct du kit PVE ; conditions Rumble **déjà structurées** dans `rumble.json` (`composition: true`), aucun parsing texte côté PVP ; variantes Grand Party / Assault Rumble.
 - [Format des données optc-db](tickets/002-format-donnees-optc-db.md) — fork 2shankz (maintenu, upstream mort) ; `units.js` objet id→champs nommés (JSON strict), `details.js` 12,4 Mo via eval node, `superSpecial`/`superSpecialCriteria` confirmés sur Saturn 4380 ; images dans le repo, URL déductible de l'ID ; build via raw GitHub + SHA épinglé ; GPLv3.
 - [Gestion de la box et batch-add par IDs](tickets/005-gestion-box.md) — input à jetons unique (espace ou collage élit chaque ID, validation immédiate avec nom, check +1 sur inconnu avec validation manuelle, acceptation partielle) ; retrait individuel avec confirmation ; filtre « ma box » par défaut dans le navigateur + panneau Box ; IDs exacts sans équivalence d'évolution ; pas d'export/import ; migration jetable par seed embarqué au premier lancement.
-- [Cadrage initial (grilling)](tickets/001-cadrage-initial.md) — 14 décisions fondatrices : la destination est une spec ; données = base optc-db complète, box = liste d'IDs ; batch-add par IDs ; équipes PVE avec supports + bateau affiché ; localStorage ; UI FR ; toutes les conditions de composition tracées quelle que soit la section ; extraction automatique ; recherche par conditions cochées ; PVP composition seulement ; portraits CDN sans fallback. La restriction initiale du friend captain à la box a été levée le 2026-08-31.
+- [Cadrage initial (grilling)](tickets/001-cadrage-initial.md) — 14 décisions fondatrices : la destination est une spec ; données = base optc-db complète, box = liste d'IDs ; batch-add par IDs ; équipes PVE avec supports + bateau affiché ; friend captain limité à la box ; localStorage ; UI FR ; toutes les conditions de composition tracées quelle que soit la section ; extraction automatique ; recherche par conditions cochées ; PVP composition seulement ; portraits CDN sans fallback.
 
 ## Not yet specified
 
@@ -39,6 +39,7 @@ _(vide — tout le fog restant est gradué en tickets.)_
 - L'implémentation de l'app elle-même — effort séparé une fois la spec finie ([Cadrage initial](tickets/001-cadrage-initial.md), Q1).
 - Effets du bateau dans les compteurs — le bateau est choisi et affiché, pas simulé (Q14).
 - Conditions temps réel PVP (secondes restantes, HP, buffs) dans le filtre — affichées pour information seulement (Q11).
+- Friend captain hors de la box (Q5).
 - Grand Party dans le builder PVP — l'utilisateur n'y joue pas ; se rebâtirait sur la brique « équipe 8 slots » si le besoin émerge ([Spécification du team builder](tickets/006-spec-team-builder.md)).
 - Fallback d'images hors CDN (Q12).
 - Fiche détail d'un personnage dans l'app — aucune vue détail ; le navigateur de box et les builders suffisent ([Fiche détail d'un personnage](tickets/012-fiche-detail-personnage.md), fermé sans résolution).

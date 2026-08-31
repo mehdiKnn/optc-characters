@@ -17,7 +17,7 @@ Grilling en 3 rounds (l'UI est exclue du ticket — elle relève du [Prototype U
 
 ### Équipe PVE
 
-- **Structure** : capitaine + friend captain choisi dans toute la base + 4 membres ; au plus **1 support par personnage possédé** (capitaine et 4 membres → 5 supports max, **jamais sur le friend captain**) ; un bateau, choisi librement dans toute la base (la possession des bateaux est tracée dans la box mais reste informative).
+- **Structure** : capitaine + friend captain + 4 membres ; au plus **1 support par personnage possédé** (capitaine et 4 membres → 5 supports max, **jamais sur le friend captain**) ; un bateau, choisi librement dans toute la base (la possession des bateaux est tracée dans la box mais reste informative).
 - **Supports** : le validateur n'évalue que la **cible** (`support[].Characters`, texte libre) ; un support dont le soutenu ne satisfait pas la cible reste plaçable, marqué « effet non applicable ». Les conditions enfouies dans la description de l'effet ne sont pas évaluées. → nouveau ticket de recherche [Grammaire des cibles de support](011-grammaire-cibles-support.md).
 - **Doublons** : interdits par **personnage du lore** = par famille (`families.js`) ; conflit dès qu'une famille est partagée (ex. « Monkey D. Luffy » vs « Luffy & Law ») ; s'applique à tous les emplacements (équipage, friend captain, supports).
 - **Coût** : plafond **saisi par le joueur et mémorisé** ; friend captain exclu du total, **supports inclus** ; le dépassement est **bloquant** — l'ajout qui ferait dépasser est refusé. Une équipe sauvegardée qui dépasse un plafond abaissé après coup reste sauvegardée, marquée en dépassement.
