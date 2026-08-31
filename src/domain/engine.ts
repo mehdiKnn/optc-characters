@@ -1,10 +1,5 @@
 import type { CompositionCondition, Id, PveTeam, PvpTeam, RumbleCondition, SupportTarget, SupportVerdict, TargetToken, Unit } from './types'
 
-export function candidatePool(teamType: 'pve' | 'pvp', activeSlot: number, selectingSupport: boolean, boxIds: Id[], units: Record<Id, Unit>): Unit[] {
-  if (teamType === 'pve' && activeSlot === 1 && !selectingSupport) return Object.values(units)
-  return boxIds.map(id => units[id]).filter(Boolean)
-}
-
 export function matchesToken(unit: Unit, token: TargetToken): boolean {
   if (token.kind === 'type') return unit.types.includes(token.value)
   if (token.kind === 'class') return unit.classes.includes(token.value)
