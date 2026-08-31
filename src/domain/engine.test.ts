@@ -15,6 +15,7 @@ describe('moteur public de composition', () => {
 
   it('détecte un doublon dès qu’une famille est partagée', () => {
     expect(hasFamilyConflict(unit('a', { families: ['Luffy'] }), [unit('b', { families: ['Luffy', 'Gear 5'] })])).toBe(true)
+    expect(hasFamilyConflict(unit('a', { families: ['Luffy'] }), [unit('a', { families: ['Luffy'] })])).toBe(true)
   })
 
   it('compte une condition sur l’union des cibles', () => {
@@ -29,6 +30,11 @@ describe('moteur public de composition', () => {
       { family: 'rainbow', section: '', comparator: 'each', targets: [{ kind: 'type', value: 'STR' }, { kind: 'type', value: 'DEX' }], original: 'b', checkable: true },
     ]
     expect(candidateProgress(unit('x'), [], conditions)).toEqual({ score: 2, violates: false })
+  })
+
+  it('transforme un compte exact atteint en contrainte', () => {
+    const exact: CompositionCondition = { family: 'threshold', section: '', count: 1, comparator: 'exact', targets: [{ kind: 'type', value: 'STR' }], original: 'exact', checkable: true }
+    expect(candidateProgress(unit('b'), [unit('a')], [exact]).violates).toBe(true)
   })
 
   it('rend indéterminée une cible de support taggée sur une unité sans tags', () => {

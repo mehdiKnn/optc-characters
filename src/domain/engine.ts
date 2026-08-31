@@ -53,6 +53,11 @@ export function candidateProgress(candidate: Unit, crew: Unit[], checked: Compos
   let score = 0
   let violates = false
   for (const condition of checked) {
+    if (condition.comparator === 'exact') {
+      const before = conditionState(condition, crew)
+      if (before.done && matchesAny(candidate, condition.targets)) violates = true
+      if (before.done) continue
+    }
     if (condition.negative || condition.comparator === 'only') {
       if (condition.comparator === 'only' && !matchesAny(candidate, condition.targets)) violates = true
       else if (condition.comparator === 'less') {
@@ -73,7 +78,7 @@ export function candidateProgress(candidate: Unit, crew: Unit[], checked: Compos
 }
 
 export function hasFamilyConflict(candidate: Unit, occupants: Unit[]): boolean {
-  return candidate.families.some(family => occupants.some(unit => unit.id !== candidate.id && unit.families.includes(family)))
+  return candidate.families.some(family => occupants.some(unit => unit.families.includes(family)))
 }
 
 export function teamCost(team: Pick<PveTeam, 'type' | 'slots' | 'supports'> | Pick<PvpTeam, 'type' | 'slots'>, units: Record<Id, Unit>): number {
@@ -113,4 +118,16 @@ export function rumbleConditionToComposition(condition: RumbleCondition): Compos
   }
   if (condition.type === 'character') return { family: 'member', section: 'Rumble', comparator: 'present', targets: (Array.isArray(condition.families) ? condition.families : []).map(value => ({ kind: 'name', value: String(value) })), original: condition.original, checkable: true }
   return null
+}
+
+export function rumbleConditionsToComposition(condition: RumbleCondition): CompositionCondition[] {
+  const direct = rumbleConditionToComposition(condition)
+  if (direct) return [direct]
+  if (condition.type !== 'multi' || !Array.isArray(condition.conditions)) return []
+  const children = condition.conditions.flatMap(child => rumbleConditionsToComposition({ ...(child as RumbleCondition), checkable: true, original: condition.original }))
+  if (condition.conjunction === 'or' && children.length > 1 && children.every(child => child.family === 'threshold' && child.count === children[0].count && child.comparator === children[0].comparator)) {
+    const targets = [...new Map(children.flatMap(child => child.targets).map(token => [`${token.kind}:${token.value}`, token])).values()]
+    return [{ ...children[0], targets, original: condition.original }]
+  }
+  return children.map(child => ({ ...child, original: `${condition.original} · ${child.original}` }))
 }

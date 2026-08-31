@@ -89,10 +89,12 @@ export function parseCompositionCondition(text, section, knownTags = []) {
   }
   const rainbow = original.match(/at least one of each\s*:\s*(.+?)(?:\.|$)/i)
   if (rainbow && !/orb/i.test(original)) return { family: 'rainbow', section, comparator: 'each', targets: tokenizeGroup(rainbow[1], knownTags), original, checkable: true }
-  const scaler = original.match(/(?:based on|depending on) (?:the number of|how many) (.+?) characters?/i)
+  const scaler = original.match(/(?:based on|depending on) (?:(?:the )?number of|how many) (.+?) characters? (?:are |you have )?(?:on|in) (?:the|your) (?:crew|team)/i)
   if (scaler) return { family: 'scaler', section, comparator: 'scale', targets: tokenizeGroup(scaler[1], knownTags), original, checkable: true }
   const absence = original.match(/there are no (.+?) characters? (?:on|in)/i)
   if (absence) return { family: 'threshold', section, count: 0, comparator: 'exact', targets: tokenizeGroup(absence[1], knownTags), original, checkable: true, negative: true }
+  const presence = original.match(/If (?:there(?:'s| is| are)|you have) (?:an? )?(.+?) characters? (?:on|in) (?:the|your) crew/i)
+  if (presence) return { family: 'threshold', section, count: 1, comparator: 'more', targets: tokenizeGroup(presence[1], knownTags), original, checkable: true }
   const only = original.match(/crew has only (.+?) characters?/i)
   if (only) return { family: 'threshold', section, comparator: 'only', targets: tokenizeGroup(only[1], knownTags), original, checkable: true, negative: true }
   const threshold = original.match(/(?:crew has|you(?:r crew)? ha(?:ve|s)|If there (?:is|are)|When any)\s+(\d+)(\+|\s+or more|\s+or fewer|\s+or less)?\s+(.+?)\s+characters?\b/i)
@@ -101,6 +103,10 @@ export function parseCompositionCondition(text, section, knownTags = []) {
     const comparator = op === 'or fewer' || op === 'or less' ? 'less' : op ? 'more' : 'exact'
     return { family: 'threshold', section, count: Number(threshold[1]), comparator, targets: tokenizeGroup(threshold[3], knownTags), original, checkable: true, negative: comparator === 'less' }
   }
+  const onCrew = original.match(/(?:If|When)\s+(?:any\s+)?(\d+)?\s*(.+?)\s+characters?[^.;]{0,80}\bare on (?:the|your) crew/i)
+  if (onCrew) return { family: 'threshold', section, count: Number(onCrew[1] || 1), comparator: 'more', targets: tokenizeGroup(onCrew[2], knownTags), original, checkable: true }
+  const simpleRoster = original.match(/crew must consist of\s+(\d+)\+?\s+(.+?)\s+characters?/i)
+  if (simpleRoster) return { family: 'threshold', section, count: Number(simpleRoster[1]), comparator: 'more', targets: tokenizeGroup(simpleRoster[2], knownTags), original, checkable: true }
   if (/crew|characters? (?:on|in) (?:the|your) crew/i.test(original)) {
     return { family: 'raw', section, comparator: 'info', targets: [], original, checkable: false }
   }
@@ -117,7 +123,7 @@ export function splitNames(value) {
     if (source[index] === ')') depth -= 1
     if (depth === 0) {
       const rest = source.slice(index)
-      const match = rest.match(/^(,\s*|\s+(?:and|or)\s+)/i)
+      const match = rest.match(/^(,\s*(?:(?:and|or)\s+)?|\s+(?:and|or)\s+)/i)
       if (match) {
         result.push(source.slice(start, index).trim())
         index += match[0].length - 1
@@ -156,11 +162,12 @@ function resolveNames(value, vocab) {
   const aliases = { 'Howling Gabu': 'Gabu', 'Building Snake': 'Snake', Gen: 'Genzo', 'Mr. Tom': 'Tom', Onion: 'Onion, Pepper & Carrot', Pepper: 'Onion, Pepper & Carrot' }
   const resolved = []
   for (const raw of splitNames(value)) {
-    const token = raw.replace(/^(?:Sir|Dr\.)\s+/, '').trim()
+    const token = raw.trim()
     const groupPrefix = tokenizeGroup(token, vocab.tags)
     const clean = token.replace(/\[[^\]]+\]|\b(?:Fighter|Slasher|Striker|Shooter|Free Spirit|Cerebral|Powerhouse|Driven)\b/gi, '').trim()
     const parenthetical = clean.match(/^(.+?)\s*\((.+)\)$/)
-    const candidates = parenthetical ? [parenthetical[1], parenthetical[2]] : [aliases[clean] || clean]
+    const stripped = clean.replace(/^(?:Sir|Dr\.)\s+/, '').trim()
+    const candidates = parenthetical ? [parenthetical[1], parenthetical[2]] : [aliases[clean] || clean, aliases[stripped] || stripped]
     const valid = candidates.filter(name => vocab.families.has(name) || vocab.unitNames.has(name))
     if (!valid.length) return []
     resolved.push({ names: valid, tokens: groupPrefix })

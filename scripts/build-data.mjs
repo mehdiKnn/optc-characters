@@ -70,7 +70,8 @@ let rawSupports = 0
 for (const [id, raw] of Object.entries(units)) {
   const detail = details?.[id] || {}
   const conditions = []
-  for (const { section, text } of walkStrings({ captain: detail.captain, special: detail.special, sailor: detail.sailor, superSpecialCriteria: detail.superSpecialCriteria, superTandem: detail.superTandem?.characterCondition })) {
+  const compositionSources = { captain: detail.captain, captainNotes: detail.captainNotes, special: detail.special, specialNotes: detail.specialNotes, sailor: detail.sailor, superSpecialCriteria: detail.superSpecialCriteria, superTandem: detail.superTandem?.characterCondition, potential: detail.potential, limit: detail.limit, rush: detail.rush?.characterCondition, lastTap: detail.lastTap?.condition }
+  for (const { section, text } of walkStrings(compositionSources)) {
     for (const clause of splitClauses(text)) {
       const condition = parseCompositionCondition(clause, section, knownTags)
       if (condition) {
@@ -125,3 +126,5 @@ await fs.mkdir(outDir, { recursive: true })
 await fs.writeFile(path.join(outDir, 'index.json'), JSON.stringify(index))
 console.log(`Index généré: ${Object.keys(generatedUnits).length} unités, ${ships.length} bateaux, seed ${seed.length} IDs.`)
 console.warn(`Couverture informative: conditions ${parsedConditions} parsées / ${rawConditions} fallback; supports ${parsedSupports} parsés / ${rawSupports} fallback.`)
+if (parsedConditions < 2083) console.warn(`AVERTISSEMENT couverture conditions: ${parsedConditions} < baseline 2083 (rapport cover4).`)
+if (parsedSupports < 2259) console.warn(`AVERTISSEMENT couverture supports: ${parsedSupports} < baseline 2259 (rapport cover11).`)

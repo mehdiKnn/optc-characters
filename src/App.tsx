@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Box, Check, ChevronLeft, Copy, Plus, Save, Search, Shield, ShipWheel, Swords, Trash2, Users, X } from 'lucide-react'
 import rawData from './generated/index.json'
-import { candidateProgress, conditionKey, conditionState, hasFamilyConflict, matchesModifier, mergeConditions, rumbleConditionToComposition, supportVerdict, teamCost } from './domain/engine'
+import { candidateProgress, conditionKey, conditionState, hasFamilyConflict, matchesModifier, mergeConditions, rumbleConditionsToComposition, supportVerdict, teamCost } from './domain/engine'
 import { createTeam, storage } from './domain/storage'
 import type { CompositionCondition, CostCaps, DataIndex, Id, PveTeam, PvpModifier, PvpTeam, Team, Unit } from './domain/types'
 
@@ -128,7 +128,9 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
   const scores = new Map(scored.map(item => [item.unit.id, item.score]))
 
   const select = (unit: Unit) => {
-    if (hasFamilyConflict(unit, occupants)) return alert('Doublon interdit : ce personnage partage une famille avec un membre ou support déjà placé.')
+    const replacedId = team.type === 'pve' && supportFor !== null ? team.supports[supportFor] : team.slots[activeSlot]
+    const otherOccupants = occupants.filter(occupant => occupant.id !== replacedId)
+    if (hasFamilyConflict(unit, otherOccupants)) return alert('Doublon interdit : ce personnage partage une famille avec un membre ou support déjà placé.')
     if (team.type === 'pve' && supportFor !== null) {
       const next = { ...team, supports: { ...team.supports, [supportFor]: unit.id } }
       if (teamCost(next, data.units) > cap) return alert(`Plafond de coût dépassé (${cap}).`)
@@ -145,7 +147,8 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
     <div className="builder-head"><button className="back" onClick={onBack}><ChevronLeft size={18} /> Équipes</button><input aria-label="Nom de l’équipe" value={team.name} onChange={event => onChange({ ...team, name: event.target.value })} /><span className={`mode-label ${team.type}`}>{team.type === 'pve' ? 'PVE' : 'PIRATE RUMBLE'}</span>{team.type === 'pvp' && <select value={team.mode} onChange={event => onChange({ ...team, mode: event.target.value as PvpTeam['mode'] })}><option value="normal">Rumble normal</option><option value="assault">Assault Rumble</option></select>}<span className={`cost-head ${currentCost > cap ? 'over' : ''}`}>{currentCost} / {cap}</span><span className="saved"><Save size={14} /> Sauvegardé localement</span></div>
     <div className="builder-workspace">
       <aside className="conditions-panel"><p className="panel-title">Conditions de composition</p><h2>Priorités de recherche</h2><p className="panel-help">Cochez les conditions à remplir. Les candidats sont filtrés et classés automatiquement.</p>{conditions.length ? <div className="condition-list">{conditions.map(item => {
-        const baseState = conditionState(item.condition, crew, supports, team.slots[0] ? data.units[team.slots[0]] : undefined)
+        const carrierSupports = team.type === 'pve' ? team.slots.flatMap((id, index) => id && item.carriers.includes(data.units[id].name) && team.supports[index] ? [data.units[team.supports[index]]] : []) : []
+        const baseState = conditionState(item.condition, crew, item.condition.family === 'member' ? carrierSupports : supports, team.slots[0] ? data.units[team.slots[0]] : undefined)
         const captainMatchesCarrier = team.slots[0] ? item.carriers.includes(data.units[team.slots[0]].name) : false
         const state = item.condition.family === 'captain' ? { current: captainMatchesCarrier ? 1 : 0, target: 1, done: captainMatchesCarrier, label: captainMatchesCarrier ? '✓' : '✗' } : baseState
         return <label className={`condition ${state.done ? 'done' : ''} ${!item.condition.checkable ? 'raw' : ''}`} key={item.key}>{item.condition.checkable ? <input type="checkbox" checked={team.checkedConditions.includes(item.key)} onChange={() => toggleCondition(item.key)} /> : <span className="info-dot">i</span>}<span><small>{item.condition.section || 'Rumble'} · {item.carriers.join(', ')}</small><b>{item.condition.original}</b></span><em>{state.done ? <Check size={14} /> : state.label}</em></label>
@@ -159,15 +162,30 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
 function mergeRumbleConditions(crew: Unit[]) {
   const map = new Map<string, { key: string; condition: CompositionCondition; carriers: string[] }>()
   for (const unit of crew) for (const raw of unit.rumble?.conditions || []) {
-    const condition = rumbleConditionToComposition(raw) || { family: 'raw', section: 'Rumble', comparator: 'info', targets: [], original: raw.original, checkable: false } as CompositionCondition
-    const key = conditionKey(condition); const current = map.get(key); if (current) current.carriers.push(unit.name); else map.set(key, { key, condition, carriers: [unit.name] })
+    const parsed = rumbleConditionsToComposition(raw)
+    const conditions = parsed.length ? parsed : [{ family: 'raw', section: 'Rumble', comparator: 'info', targets: [], original: raw.original, checkable: false } as CompositionCondition]
+    for (const condition of conditions) {
+      const key = conditionKey(condition); const current = map.get(key); if (current) current.carriers.push(unit.name); else map.set(key, { key, condition, carriers: [unit.name] })
+    }
   }
   return [...map.values()]
 }
 
 function TeamDock({ team, activeSlot, cap, supportFor, onSlot, onSupport, onChange }: { team: Team; activeSlot: number; cap: number; supportFor: number | null; onSlot: (i: number) => void; onSupport: (i: number) => void; onChange: (team: Team) => void }) {
   const remove = (index: number) => { const slots = [...team.slots]; slots[index] = null; if (team.type === 'pve') { const supports = { ...team.supports }; delete supports[index]; onChange({ ...team, slots: slots as PveTeam['slots'], supports }) } else onChange({ ...team, slots }) }
-  return <div className="team-dock"><div className="dock-slots">{team.slots.map((id, index) => <button className={`dock-slot ${activeSlot === index && supportFor === null ? 'active' : ''}`} key={index} onClick={() => onSlot(index)}><small>{team.type === 'pve' ? ['Capitaine', 'Friend', 'Membre 1', 'Membre 2', 'Membre 3', 'Membre 4'][index] : `Slot ${index + 1}`}</small>{id ? <><img src={portrait(id)} alt="" width="52" height="52" /><span>{data.units[id].name}</span><i role="button" aria-label="Retirer" onClick={event => { event.stopPropagation(); remove(index) }}><X size={12} /></i>{team.type === 'pve' && index !== 1 && <i className={`support-dot ${supportFor === index ? 'active' : ''}`} role="button" onClick={event => { event.stopPropagation(); onSupport(index) }}>{team.supports[index] ? <img src={portrait(team.supports[index])} alt="" /> : '+'}</i>}</> : <><Plus size={18} /><span>Choisir</span></>}</button>)}</div>{team.type === 'pve' && <label className="ship-select"><ShipWheel size={18} /><span>Bateau<small>Effets non simulés</small></span><select value={team.shipId || ''} onChange={event => onChange({ ...team, shipId: event.target.value || null })}><option value="">Aucun</option>{data.ships.map(ship => <option value={ship.id} key={ship.id}>{ship.name}</option>)}</select></label>}<div className={`dock-cost ${teamCost(team, data.units) > cap ? 'over' : ''}`}><b>{teamCost(team, data.units)}</b><small>/ {cap} coût</small></div>{team.type === 'pve' && Object.entries(team.supports).map(([index, id]) => { const supported = team.slots[Number(index)]; const verdict = supported ? supportVerdict(data.units[id].supportTarget, data.units[supported]) : 'indeterminate'; return <span className={`support-verdict ${verdict}`} title={data.units[id].supportTarget?.original} key={index}>{verdict === 'applicable' ? 'Support applicable' : verdict === 'non-applicable' ? 'Effet non applicable' : 'Cible indéterminée'}</span> })}</div>
+  return <div className="team-dock">
+    <div className="dock-slots">{team.slots.map((id, index) => {
+      const unit = id ? data.units[id] : undefined
+      const hasBonus = team.type === 'pvp' && unit && team.modifiers.some(modifier => matchesModifier(unit, modifier.targetKind, modifier.target))
+      return <button className={`dock-slot ${activeSlot === index && supportFor === null ? 'active' : ''} ${hasBonus ? 'beneficiary' : ''}`} key={index} onClick={() => onSlot(index)}>
+        <small>{team.type === 'pve' ? ['Capitaine', 'Friend', 'Membre 1', 'Membre 2', 'Membre 3', 'Membre 4'][index] : `Slot ${index + 1}`}</small>
+        {unit ? <><img src={portrait(unit.id)} alt="" width="52" height="52" /><span>{unit.name}</span>{team.type === 'pvp' && <span className="rumble-meta">{unit.rumble?.rumbleType || '—'} · DEF {unit.rumble?.def ?? '—'} · SPD {unit.rumble?.spd ?? '—'} · {unit.rumble?.cost ?? 0}c</span>}<i role="button" aria-label="Retirer" onClick={event => { event.stopPropagation(); remove(index) }}><X size={12} /></i>{team.type === 'pve' && index !== 1 && <i className={`support-dot ${supportFor === index ? 'active' : ''}`} role="button" onClick={event => { event.stopPropagation(); onSupport(index) }}>{team.supports[index] ? <img src={portrait(team.supports[index])} alt="" /> : '+'}</i>}</> : <><Plus size={18} /><span>Choisir</span></>}
+      </button>
+    })}</div>
+    {team.type === 'pve' && <label className="ship-select"><ShipWheel size={18} /><span>Bateau<small>Effets non simulés</small></span><select value={team.shipId || ''} onChange={event => onChange({ ...team, shipId: event.target.value || null })}><option value="">Aucun</option>{data.ships.map(ship => <option value={ship.id} key={ship.id}>{ship.name}</option>)}</select></label>}
+    <div className={`dock-cost ${teamCost(team, data.units) > cap ? 'over' : ''}`}><b>{teamCost(team, data.units)}</b><small>/ {cap} coût</small></div>
+    {team.type === 'pve' && Object.entries(team.supports).map(([index, id]) => { const supported = team.slots[Number(index)]; const verdict = supported ? supportVerdict(data.units[id].supportTarget, data.units[supported]) : 'indeterminate'; return <span className={`support-verdict ${verdict}`} title={data.units[id].supportTarget?.original} key={index}>{verdict === 'applicable' ? 'Support applicable' : verdict === 'non-applicable' ? 'Effet non applicable' : 'Cible indéterminée'}</span> })}
+  </div>
 }
 
 function Modifiers({ team, onChange }: { team: PvpTeam; onChange: (team: Team) => void }) {
