@@ -9,6 +9,7 @@ import type { CompositionCondition, CostCaps, DataIndex, EnemyCounter, Id, PveTe
 const data = rawData as unknown as DataIndex
 const allUnits = Object.values(data.units)
 type Page = 'teams' | 'box' | 'browse' | 'builder'
+type ConditionCombinationMode = 'and' | 'or'
 
 const portrait = (id: Id) => {
   const numeric = Number.parseInt(id, 10)
@@ -117,6 +118,7 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
   const [activeSlot, setActiveSlot] = useState(0)
   const [supportFor, setSupportFor] = useState<number | null>(null)
   const [filters, setFilters] = useState<UnitFilters>(emptyFilters)
+  const [combinationMode, setCombinationMode] = useState<ConditionCombinationMode>('and')
   const crew = team.slots.flatMap(id => id ? [data.units[id]] : [])
   const supports = team.type === 'pve' ? Object.values(team.supports).map(id => data.units[id]).filter(Boolean) : []
   const conditions = useMemo(() => team.type === 'pve' ? mergeConditions(crew) : mergeRumbleConditions(crew), [team, crew])
@@ -125,10 +127,12 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
     const carrierSupports = team.type === 'pve' ? team.slots.flatMap((id, index) => id && item.carriers.includes(data.units[id].name) && team.supports[index] ? [data.units[team.supports[index]]] : []) : []
     return conditionState(item.condition, crew, item.condition.family === 'member' ? carrierSupports : supports, team.slots[0] ? data.units[team.slots[0]] : undefined)
   }
-  const checked = checkedEntries.filter(item => item.condition.negative || item.condition.comparator === 'exact' || !stateForEntry(item).done).map(item => item.condition)
+  const checkedConditionStates = checkedEntries.map(item => ({ item, state: stateForEntry(item) }))
+  const checked = checkedConditionStates.filter(({ item, state }) => item.condition.negative || item.condition.comparator === 'exact' || !state.done).map(({ item }) => item.condition)
+  const activeConditionCount = checkedConditionStates.filter(({ item, state }) => !item.condition.negative && item.condition.comparator !== 'only' && !state.done).length
   const currentCost = teamCost(team, data.units)
   const modifierBeneficiaries = new Set<Id>(team.type === 'pvp' ? boxIds.filter(id => team.modifiers.some(modifier => matchesModifier(data.units[id], modifier.targetKind, modifier.target))) : [])
-  const scored = boxIds.map(id => data.units[id]).filter(Boolean).filter(unit => matchesUnitFilters(unit, filters)).map(unit => ({ unit, ...candidateProgress(unit, crew, checked) })).filter(item => !item.violates && (!checked.some(condition => !condition.negative && !conditionState(condition, crew).done) || item.score > 0)).sort((a, b) => b.score - a.score || byDescendingId(a.unit, b.unit))
+  const scored = boxIds.map(id => data.units[id]).filter(Boolean).filter(unit => matchesUnitFilters(unit, filters)).map(unit => ({ unit, ...candidateProgress(unit, crew, checked) })).filter(item => !item.violates && (activeConditionCount === 0 || (combinationMode === 'and' ? item.score === activeConditionCount : item.score > 0))).sort((a, b) => b.score - a.score || byDescendingId(a.unit, b.unit))
   const scores = new Map(scored.map(item => [item.unit.id, item.score]))
 
   const select = (unit: Unit) => {
@@ -156,7 +160,7 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
   return <main className="builder-page">
     <div className="builder-head"><button className="back" onClick={onBack}><ChevronLeft size={18} /> Équipes</button><input aria-label="Nom de l’équipe" value={team.name} onChange={event => onChange({ ...team, name: event.target.value })} /><span className={`mode-label ${team.type}`}>{team.type === 'pve' ? 'PVE' : 'PIRATE RUMBLE'}</span>{team.type === 'pvp' && <select value={team.mode} onChange={event => onChange({ ...team, mode: event.target.value as PvpTeam['mode'] })}><option value="normal">Rumble normal</option><option value="assault">Assault Rumble</option></select>}<span className={`cost-head ${currentCost > cap ? 'over' : ''}`}>{currentCost} / {cap}</span><span className="saved"><Save size={14} /> Sauvegardé localement</span></div>
     <div className="builder-workspace">
-      <aside className="conditions-panel"><p className="panel-title">Conditions de composition</p><h2>Priorités de recherche</h2><p className="panel-help">Cochez les conditions à remplir. Les candidats sont filtrés et classés automatiquement.</p>{conditions.length ? <div className="condition-list">{conditions.map(item => {
+      <aside className="conditions-panel"><p className="panel-title">Conditions de composition</p><h2>Priorités de recherche</h2><p className="panel-help">Cochez les conditions à remplir. Les candidats sont filtrés et classés automatiquement.</p><div className="combination-setting"><span>Combiner</span><div className="segmented" role="group" aria-label="Mode de combinaison des conditions"><button className={combinationMode === 'and' ? 'active' : ''} aria-pressed={combinationMode === 'and'} onClick={() => setCombinationMode('and')}>ET</button><button className={combinationMode === 'or' ? 'active' : ''} aria-pressed={combinationMode === 'or'} onClick={() => setCombinationMode('or')}>OU</button></div></div>{conditions.length ? <div className="condition-list">{conditions.map(item => {
         const baseState = stateForEntry(item)
         const captainMatchesCarrier = team.slots[0] ? item.carriers.includes(data.units[team.slots[0]].name) : false
         const state = item.condition.family === 'captain' ? { current: captainMatchesCarrier ? 1 : 0, target: 1, done: captainMatchesCarrier, label: captainMatchesCarrier ? '✓' : '✗' } : baseState

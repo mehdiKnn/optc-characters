@@ -105,3 +105,116 @@ describe('filtre par effet ennemi contré', () => {
     expect(screen.queryByRole('combobox', { name: 'Effet ennemi' })).not.toBeInTheDocument()
   })
 })
+
+describe('mode de combinaison des conditions', () => {
+  beforeEach(() => {
+    cleanup()
+    localStorage.clear()
+  })
+
+  const openGabanBuilder = () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Créer une équipe PVE' }))
+    fireEvent.click(screen.getByText('Nouvelle équipe PVE', { exact: true }))
+    const search = screen.getByPlaceholderText('Nom ou ID…')
+    fireEvent.change(search, { target: { value: '4630' } })
+    fireEvent.click(screen.getByText('Scopper Gaban - The Left Arm of the Pirate King', { exact: true }).closest('.unit-tile')!)
+    return search
+  }
+
+  const checkCondition = (source: RegExp) => {
+    const summary = screen.getAllByLabelText(source)[0]
+    fireEvent.click(summary.closest('label')!.querySelector('input')!)
+  }
+
+  it('combine par défaut toutes les conditions actives en ET', () => {
+    const search = openGabanBuilder()
+
+    expect(screen.getByRole('button', { name: 'ET', pressed: true })).toBeInTheDocument()
+    checkCondition(/If your crew has 6 \[DEX\] characters/)
+    checkCondition(/If your crew has 5\+ \[Elbaph Arc\], \[Giant\] or \[Roger Pirates\] characters/)
+    fireEvent.change(search, { target: { value: 'Collun' } })
+    expect(screen.getByText('Collun', { exact: true })).toBeInTheDocument()
+
+    fireEvent.change(search, { target: { value: 'Hongo' } })
+
+    expect(screen.queryByText('Hongo - Punishing the "Man-Eater"', { exact: true })).not.toBeInTheDocument()
+    expect(screen.getByText(/0 candidats/)).toBeInTheDocument()
+  })
+
+  it('réaffiche en OU un candidat qui ne progresse qu’une condition', () => {
+    const search = openGabanBuilder()
+    checkCondition(/If your crew has 6 \[DEX\] characters/)
+    checkCondition(/If your crew has 5\+ \[Elbaph Arc\], \[Giant\] or \[Roger Pirates\] characters/)
+    fireEvent.change(search, { target: { value: 'Hongo' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'OU' }))
+
+    expect(screen.getByRole('button', { name: 'OU', pressed: true })).toBeInTheDocument()
+    expect(screen.getByText('Hongo - Punishing the "Man-Eater"', { exact: true })).toBeInTheDocument()
+  })
+
+  it('retire du ET une condition déjà remplie', () => {
+    const search = openGabanBuilder()
+    const addMember = (slot: number, id: string, name: string) => {
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(`Membre ${slot}.*Choisir`) }))
+      fireEvent.change(search, { target: { value: id } })
+      fireEvent.click(screen.getByText(name, { exact: true }).closest('.unit-tile')!)
+    }
+    addMember(1, '4539', 'Kashii - Party on the Ship')
+    addMember(2, '4614', "Brook - Musician in Warrior's Outfit")
+    addMember(3, '4618', 'Collun')
+    checkCondition(/If your crew has 4\+ \[DEX\] characters/)
+    checkCondition(/If your crew has 5\+ \[Elbaph Arc\], \[Giant\] or \[Roger Pirates\] characters/)
+
+    fireEvent.change(search, { target: { value: 'Hongo' } })
+
+    expect(screen.getByText('Hongo - Punishing the "Man-Eater"', { exact: true })).toBeInTheDocument()
+  })
+
+  it('applique le même mode de combinaison en Rumble', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Rumble' }))
+    fireEvent.click(screen.getByText('Nouvelle équipe Rumble', { exact: true }))
+    const search = screen.getByPlaceholderText('Nom ou ID…')
+    fireEvent.change(search, { target: { value: '4630' } })
+    fireEvent.click(screen.getByText('Scopper Gaban - The Left Arm of the Pirate King', { exact: true }).closest('.unit-tile')!)
+    checkCondition(/4\+ \[Elbaph Arc\] dans l’équipe/)
+    checkCondition(/5\+ \[DEX\] dans l’équipe/)
+    fireEvent.change(search, { target: { value: 'Hongo' } })
+
+    expect(screen.queryByText('Hongo - Punishing the "Man-Eater"', { exact: true })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'OU' }))
+    expect(screen.getByText('Hongo - Punishing the "Man-Eater"', { exact: true })).toBeInTheDocument()
+  })
+
+  it('applique une condition « only » comme exclusion dans les deux modes', () => {
+    localStorage.setItem('optc.v1.box', JSON.stringify(['2147', '1', '1935']))
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Créer une équipe PVE' }))
+    fireEvent.click(screen.getByText('Nouvelle équipe PVE', { exact: true }))
+    const search = screen.getByPlaceholderText('Nom ou ID…')
+    fireEvent.change(search, { target: { value: '2147' } })
+    fireEvent.click(screen.getByText("Vinsmoke Sanji - Germa Kingdom's Sacrifice", { exact: true }).closest('.unit-tile')!)
+    checkCondition(/If your crew has only Fighter characters/)
+
+    fireEvent.change(search, { target: { value: '1' } })
+    expect(screen.getByText('Monkey D. Luffy', { exact: true })).toBeInTheDocument()
+    fireEvent.change(search, { target: { value: '1935' } })
+    expect(screen.queryByText('Franky - Super Weapon from a Future Land', { exact: true })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'OU' }))
+    expect(screen.queryByText('Franky - Super Weapon from a Future Land', { exact: true })).not.toBeInTheDocument()
+    fireEvent.change(search, { target: { value: '1' } })
+    expect(screen.getByText('Monkey D. Luffy', { exact: true })).toBeInTheDocument()
+  })
+
+  it('revient à ET à chaque ouverture du builder', () => {
+    openGabanBuilder()
+    fireEvent.click(screen.getByRole('button', { name: 'OU' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Équipes' })[1])
+    fireEvent.click(screen.getByText('Nouvelle équipe PVE', { exact: true }))
+
+    expect(screen.getByRole('button', { name: 'ET', pressed: true })).toBeInTheDocument()
+  })
+})
