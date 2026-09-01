@@ -47,3 +47,61 @@ describe('sélection du Friend Captain', () => {
     expect(screen.getByRole('button', { name: /Friend.*Scopper Gaban/ })).toBeInTheDocument()
   })
 })
+
+describe('filtre par effet ennemi contré', () => {
+  beforeEach(() => {
+    cleanup()
+    localStorage.clear()
+  })
+
+  it('filtre toute la base en intersection et affiche la nature du contre', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Base' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ma box' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Effet ennemi' }), { target: { value: 'Barrier' } })
+    fireEvent.change(screen.getByPlaceholderText('Nom ou ID…'), { target: { value: 'Sogeking' } })
+
+    expect(screen.getByText('Sogeking', { exact: true })).toBeInTheDocument()
+    expect(screen.getAllByText('ignore · potential').length).toBeGreaterThan(0)
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Effet ennemi' }), { target: { value: 'Slot Barrier' } })
+    fireEvent.change(screen.getByPlaceholderText('Nom ou ID…'), { target: { value: '3364' } })
+    expect(screen.getByText('Sanji - Blue Suit Cook', { exact: true })).toBeInTheDocument()
+    expect(screen.getByText('réduit 5 stacks · potential')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Effet ennemi' }), { target: { value: 'ATK Up' } })
+    fireEvent.change(screen.getByPlaceholderText('Nom ou ID…'), { target: { value: '3049' } })
+    expect(screen.getByText('réduit complètement · special')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByPlaceholderText('Nom ou ID…'), { target: { value: 'Monkey D. Luffy' } })
+    expect(screen.queryByText('Sogeking', { exact: true })).not.toBeInTheDocument()
+  })
+
+  it('intersecte le filtre avec la recherche intelligente du builder', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Créer une équipe PVE' }))
+    fireEvent.click(screen.getByText('Nouvelle équipe PVE', { exact: true }))
+
+    const search = screen.getByPlaceholderText('Nom ou ID…')
+    fireEvent.change(search, { target: { value: '1935' } })
+    fireEvent.click(screen.getByText('Franky - Super Weapon from a Future Land', { exact: true }).closest('.unit-tile')!)
+
+    const conditionSummary = screen.getAllByLabelText(/If your crew has 6 characters with Fighter/)[0]
+    fireEvent.click(conditionSummary.closest('label')!.querySelector('input')!)
+    fireEvent.change(search, { target: { value: 'Bobbin' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Effet ennemi' }), { target: { value: 'Threshold Damage Reduction' } })
+
+    expect(screen.getByText('Bobbin - Big Mom Pirates', { exact: true })).toBeInTheDocument()
+    expect(screen.getByText('réduit 5 tours · special')).toBeInTheDocument()
+
+    fireEvent.change(search, { target: { value: 'Avalo Pizarro' } })
+    expect(screen.queryByText('Avalo Pizarro - Island-Man Stopping the Destruction', { exact: true })).not.toBeInTheDocument()
+  })
+
+  it('ne propose pas ce filtre dans le builder PVP', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Rumble' }))
+    fireEvent.click(screen.getByText('Nouvelle équipe Rumble', { exact: true }))
+    expect(screen.queryByRole('combobox', { name: 'Effet ennemi' })).not.toBeInTheDocument()
+  })
+})

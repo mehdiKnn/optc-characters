@@ -38,6 +38,14 @@ export interface RumbleCondition {
   conditions?: RumbleCondition[]
   [key: string]: unknown
 }
+export interface EnemyCounter {
+  effect: string
+  nature: 'ignore' | 'reduce'
+  turns?: number
+  stacks?: number
+  complete?: boolean
+  source: 'special' | 'captain' | 'potential'
+}
 export interface Unit {
   id: Id
   name: string
@@ -50,6 +58,7 @@ export interface Unit {
   tags: string[]
   flags: string[]
   conditions: CompositionCondition[]
+  counters: EnemyCounter[]
   supportTarget?: SupportTarget
   rumble?: { rumbleType?: string; def?: number; spd?: number; cost: number; conditions: RumbleCondition[] }
 }
@@ -59,7 +68,7 @@ export interface DataIndex {
   units: Record<Id, Unit>
   ships: Ship[]
   seed: Id[]
-  filters: { types: string[]; classes: string[]; tags: string[] }
+  filters: { types: string[]; classes: string[]; tags: string[]; effects: string[] }
 }
 export interface PveTeam {
   id: string

@@ -163,6 +163,113 @@ export function parseSupportTarget(text, vocab) {
   return { original }
 }
 
+export const enemyCounterKey = counter => `${counter.effect}:${counter.nature}:${counter.turns ?? ''}:${counter.stacks ?? ''}:${counter.complete ? 'complete' : ''}:${counter.source}`
+
+function normalizeCounterEffect(value) {
+  const normalized = String(value)
+    .replace(/\s+(?:Buffs?|Effects?|status)\s*$/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s,]+|[\s,.]+$/g, '')
+  const aliases = {
+    'atk up': 'ATK Up',
+    'increase defense': 'Increased Defense',
+    'increased defense': 'Increased Defense',
+    'thredhold damage reduction': 'Threshold Damage Reduction',
+    'positive': 'Positive Buffs',
+  }
+  return aliases[normalized.toLowerCase()] || normalized.replace(/\b[a-z]/g, letter => letter.toUpperCase())
+}
+
+const invalidCounterExpression = /\b(?:crew['’]s|characters?|when|activated|deals?|reduces?|changes?|your|if|duration|inflicts?)\b|\d+\s*%|\bby\s+\d+\s+turns?\b/i
+
+function validCounterExpression(effect) {
+  return effect && !invalidCounterExpression.test(effect)
+}
+
+function validCounterEffect(effect) {
+  return validCounterExpression(effect) && effect.length <= 80 && !/^\[[^\]]+\]$/.test(effect) && !['Increase Damage Taken', 'Poison', 'Weaken'].includes(effect)
+}
+
+function splitCounterEffects(value) {
+  return String(value)
+    .split(/\s*(?:,|\band\b|\bor\b)\s*/i)
+    .map(normalizeCounterEffect)
+    .filter(validCounterEffect)
+}
+
+/** Parse enemy-side defensive effects countered by a special or captain ability. */
+export function parseEnemyCounters(text, source) {
+  const original = String(text || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!original) return []
+  const counters = []
+  const reductionPatterns = [
+    /reduces?\s+(?:the\s+duration\s+of\s+)?(?:all\s+)?enemies['’]\s+([^.;]{1,240}?)\s+duration\s+by\s+(\d+)(?:-(\d+))?\s+(?:additional\s+)?turns?/gi,
+    /reduces?\s+([^.;]{1,240}?)\s+duration\s+of\s+(?:all\s+)?enemies\s+by\s+(\d+)(?:-(\d+))?\s+(?:additional\s+)?turns?/gi,
+  ]
+  for (const pattern of reductionPatterns) {
+    for (const match of original.matchAll(pattern)) {
+      const expression = match[1].replace(/\s+and\s+crew['’]s\b.*$/i, '')
+      const wholeEffect = normalizeCounterEffect(expression)
+      if (validCounterExpression(wholeEffect)) {
+        for (const effect of splitCounterEffects(expression)) {
+          counters.push({ effect, nature: 'reduce', turns: Number(match[3] || match[2]), source })
+        }
+      }
+    }
+  }
+  const directReduction = /reduces?\s+(?:all\s+)?enemies['’]\s+([^,.;]{1,80}?)\s+by\s+(\d+)\s+(?:additional\s+)?turns?/gi
+  for (const match of original.matchAll(directReduction)) {
+    const wholeEffect = normalizeCounterEffect(match[1])
+    if (validCounterEffect(wholeEffect)) {
+      for (const effect of splitCounterEffects(match[1])) counters.push({ effect, nature: 'reduce', turns: Number(match[2]), source })
+    }
+  }
+
+  const additionalReduction = /reduce\s+(?:all\s+)?enemies['’]\s+([^.;]+?),\s*reduces?\s+the\s+duration\s+by\s+(\d+)\s+additional\s+turns?/gi
+  for (const match of original.matchAll(additionalReduction)) {
+    for (const effect of splitCounterEffects(match[1])) counters.push({ effect, nature: 'reduce', turns: Number(match[2]), source })
+  }
+
+  const completeReduction = /removes?\s+(?:all\s+)?enemies['’]\s+([^.;]{1,240}?)\s+duration\s+completely/gi
+  for (const match of original.matchAll(completeReduction)) {
+    const wholeEffect = normalizeCounterEffect(match[1])
+    if (validCounterExpression(wholeEffect)) {
+      for (const effect of splitCounterEffects(match[1])) counters.push({ effect, nature: 'reduce', complete: true, source })
+    }
+  }
+
+  if (/\b(?:attacks?|normal attacks?|ability)\b[^.;]{0,160}\bignore(?:s)?\b[^.;]{0,80}\bbarriers?\b|\bwill ignore barriers?\b|#\{ignoreBarrier\}/i.test(original)) {
+    counters.push({ effect: 'Barrier', nature: 'ignore', source })
+  }
+  if (/\bignore(?:s)?\b[^.;]{0,80}\bdamage reducing Barriers and Buffs\b/i.test(original)) {
+    for (const effect of ['Percent Damage Reduction', 'Threshold Damage Reduction', 'Damage Nullification']) counters.push({ effect, nature: 'ignore', source })
+  }
+  if (/\bignore(?:s)?\b[^.;]{0,80}\bdamage (?:negating|nullification)\b/i.test(original)) {
+    counters.push({ effect: 'Damage Nullification', nature: 'ignore', source })
+  }
+  return [...new Map(counters.map(counter => [enemyCounterKey(counter), counter])).values()]
+}
+
+/** Potential abilities have canonical names; descriptions are used only for max turns. */
+export function parsePotentialCounters(potentialAbilities) {
+  const counters = []
+  for (const ability of asArray(potentialAbilities)) {
+    const name = String(ability?.Name || '').trim()
+    if (/^Barrier Penetration$/i.test(name)) {
+      counters.push({ effect: 'Barrier', nature: 'ignore', source: 'potential' })
+      continue
+    }
+    const reduction = name.match(/^(?:Reduce )?(Slot Barrier)(?: duration)?$/i)
+    if (!reduction) continue
+    const amounts = walkStrings(ability?.description).flatMap(({ text }) => [...String(text).matchAll(/by\s+(\d+)\s+(turns?|stacks?)/gi)].map(match => ({ amount: Number(match[1]), unit: match[2].toLowerCase() })))
+    if (amounts.length) {
+      const strongest = amounts.reduce((best, value) => value.amount > best.amount ? value : best)
+      counters.push({ effect: normalizeCounterEffect(reduction[1]), nature: 'reduce', ...(strongest.unit.startsWith('stack') ? { stacks: strongest.amount } : { turns: strongest.amount }), source: 'potential' })
+    }
+  }
+  return [...new Map(counters.map(counter => [enemyCounterKey(counter), counter])).values()]
+}
+
 function resolveNames(value, vocab) {
   const aliases = { 'Howling Gabu': 'Gabu', 'Building Snake': 'Snake', Gen: 'Genzo', 'Mr. Tom': 'Tom', Onion: 'Onion, Pepper & Carrot', Pepper: 'Onion, Pepper & Carrot' }
   const resolved = []

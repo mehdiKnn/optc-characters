@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { asArray, downloadData, evaluateDataFile, loadConfig, parseCompositionCondition, parseSupportTarget, splitClauses, unique, walkStrings } from './data-utils.mjs'
+import { asArray, downloadData, enemyCounterKey, evaluateDataFile, loadConfig, parseCompositionCondition, parseEnemyCounters, parsePotentialCounters, parseSupportTarget, splitClauses, unique, walkStrings } from './data-utils.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const config = await loadConfig(root)
@@ -67,6 +67,8 @@ let parsedConditions = 0
 let rawConditions = 0
 let parsedSupports = 0
 let rawSupports = 0
+let parsedCounters = 0
+let rawCounterClauses = 0
 for (const [id, raw] of Object.entries(units)) {
   const detail = details?.[id] || {}
   const conditions = []
@@ -83,6 +85,22 @@ for (const [id, raw] of Object.entries(units)) {
   const supportText = detail.support?.[0]?.Characters
   const supportTarget = supportText ? parseSupportTarget(supportText, vocab) : undefined
   if (supportTarget) supportTarget.rule ? parsedSupports += 1 : rawSupports += 1
+  const counters = []
+  const counterSources = { captain: { captain: detail.captain, notes: detail.captainNotes }, special: { special: detail.special, notes: detail.specialNotes } }
+  for (const [source, value] of Object.entries(counterSources)) {
+    for (const { text } of walkStrings(value)) {
+      const parsed = parseEnemyCounters(text, source)
+      counters.push(...parsed)
+      parsedCounters += parsed.length
+      for (const clause of splitClauses(text)) {
+        if (!parseEnemyCounters(clause, source).length && /(?:reduces?[^.;]{0,100}(?:enemies['’].*duration|duration of (?:all )?enemies)|(?:ignore|penetrat)[^.;]{0,100}(?:barrier|damage negating))/i.test(clause)) rawCounterClauses += 1
+      }
+    }
+  }
+  const potentialCounters = parsePotentialCounters(detail.potential)
+  counters.push(...potentialCounters)
+  parsedCounters += potentialCounters.length
+  const uniqueCounters = [...new Map(counters.map(counter => [enemyCounterKey(counter), counter])).values()]
   const rumble = resolveRumble(id)
   generatedUnits[id] = {
     id: String(raw.id ?? id),
@@ -96,6 +114,7 @@ for (const [id, raw] of Object.entries(units)) {
     tags: flattenTags(tags?.[id]),
     flags: Object.entries(flags?.[id] || {}).filter(([, enabled]) => enabled).map(([flag]) => flag),
     conditions,
+    counters: uniqueCounters,
     supportTarget,
     rumble: rumble ? {
       rumbleType: rumble.stats?.rumbleType,
@@ -111,7 +130,7 @@ const historicalSeed = JSON.parse(await fs.readFile(path.join(root, 'seed.json')
 const seed = unique(historicalSeed.map(id => String(id))).filter(id => generatedUnits[id])
 const ships = asArray(shipsRaw).map((ship, index) => ship && ship.name ? ({ id: String(index), name: ship.name, thumb: ship.thumb || `ship_${String(index + 1).padStart(4, '0')}_t2.png`, description: ship.description || '' }) : null).filter(Boolean)
 const index = {
-  meta: { dbVersion: version, sha: config.sha, repository: config.repository, cdn: config.cdn, generatedAt: new Date().toISOString(), coverage: { parsedConditions, rawConditions, parsedSupports, rawSupports } },
+  meta: { dbVersion: version, sha: config.sha, repository: config.repository, cdn: config.cdn, generatedAt: new Date().toISOString(), coverage: { parsedConditions, rawConditions, parsedSupports, rawSupports, parsedCounters, rawCounterClauses } },
   units: generatedUnits,
   ships,
   seed,
@@ -119,13 +138,15 @@ const index = {
     types: unique(Object.values(generatedUnits).flatMap(unit => unit.types)).sort(),
     classes: unique(Object.values(generatedUnits).flatMap(unit => unit.classes)).sort(),
     tags: unique(Object.values(generatedUnits).flatMap(unit => unit.tags)).sort(),
+    effects: unique(Object.values(generatedUnits).flatMap(unit => unit.counters.map(counter => counter.effect))).sort(),
   },
 }
 const outDir = path.join(root, 'src', 'generated')
 await fs.mkdir(outDir, { recursive: true })
 await fs.writeFile(path.join(outDir, 'index.json'), JSON.stringify(index))
 console.log(`Index généré: ${Object.keys(generatedUnits).length} unités, ${ships.length} bateaux, seed ${seed.length} IDs.`)
-console.warn(`Couverture informative: conditions ${parsedConditions} parsées / ${rawConditions} fallback; supports ${parsedSupports} parsés / ${rawSupports} fallback.`)
-const COVERAGE_BASELINES = { conditions: 2083, supports: 2259 } // Corpus documentés dans wayfinder/research/004 et 011.
+console.warn(`Couverture informative: conditions ${parsedConditions} parsées / ${rawConditions} fallback; supports ${parsedSupports} parsés / ${rawSupports} fallback; contres ${parsedCounters} parsés / ${rawCounterClauses} clauses à revoir.`)
+const COVERAGE_BASELINES = { conditions: 2083, supports: 2259, counters: 2123 } // Baselines informatives du corpus épinglé.
 if (parsedConditions < COVERAGE_BASELINES.conditions) console.warn(`AVERTISSEMENT couverture conditions: ${parsedConditions} < baseline ${COVERAGE_BASELINES.conditions} (rapport cover4).`)
 if (parsedSupports < COVERAGE_BASELINES.supports) console.warn(`AVERTISSEMENT couverture supports: ${parsedSupports} < baseline ${COVERAGE_BASELINES.supports} (rapport cover11).`)
+if (parsedCounters < COVERAGE_BASELINES.counters) console.warn(`AVERTISSEMENT couverture contres: ${parsedCounters} < baseline ${COVERAGE_BASELINES.counters}.`)

@@ -4,7 +4,7 @@ import type { CompositionCondition, Unit } from './types'
 
 const unit = (id: string, overrides: Partial<Unit> = {}): Unit => ({
   id, name: `Unit ${id}`, types: ['STR'], classes: ['Fighter'], stars: '5', cost: 20, combo: 4,
-  families: [`Family ${id}`], tags: ['Navy'], flags: [], conditions: [], ...overrides,
+  families: [`Family ${id}`], tags: ['Navy'], flags: [], conditions: [], counters: [], ...overrides,
 })
 
 describe('moteur public de composition', () => {

@@ -4,7 +4,7 @@ import rawData from './generated/index.json'
 import { addMergedCondition, candidateProgress, conditionState, hasFamilyConflict, matchesModifier, mergeConditions, rumbleConditionsToComposition, supportVerdict, teamCost, type MergedCondition } from './domain/engine'
 import { conditionSectionLabel, conditionSummary } from './domain/conditionPresentation'
 import { createTeam, storage } from './domain/storage'
-import type { CompositionCondition, CostCaps, DataIndex, Id, PveTeam, PvpModifier, PvpTeam, Team, Unit } from './domain/types'
+import type { CompositionCondition, CostCaps, DataIndex, EnemyCounter, Id, PveTeam, PvpModifier, PvpTeam, Team, Unit } from './domain/types'
 
 const data = rawData as unknown as DataIndex
 const allUnits = Object.values(data.units)
@@ -17,6 +17,9 @@ const portrait = (id: Id) => {
 }
 const shipImage = (thumb: string) => `${data.meta.cdn}/res/${thumb}`
 const byDescendingId = (a: Unit, b: Unit) => Number.parseInt(b.id) - Number.parseInt(a.id)
+type UnitFilters = { query: string; type: string; unitClass: string; tag: string; effect: string }
+const emptyFilters = (): UnitFilters => ({ query: '', type: '', unitClass: '', tag: '', effect: '' })
+const matchesUnitFilters = (unit: Unit, filters: UnitFilters) => (!filters.query || `${unit.id} ${unit.name}`.toLowerCase().includes(filters.query.toLowerCase())) && (!filters.type || unit.types.includes(filters.type)) && (!filters.unitClass || unit.classes.includes(filters.unitClass)) && (!filters.tag || unit.tags.includes(filters.tag)) && (!filters.effect || unit.counters.some(counter => counter.effect === filters.effect))
 
 export default function App() {
   const [page, setPage] = useState<Page>('teams')
@@ -95,29 +98,25 @@ function BoxPage({ boxIds, ownedShips, onBox, onShips }: { boxIds: Id[]; ownedSh
 
 function Browser({ boxIds }: { boxIds: Id[] }) {
   const [mine, setMine] = useState(true)
-  const [query, setQuery] = useState('')
-  const [type, setType] = useState('')
-  const [unitClass, setUnitClass] = useState('')
-  const [tag, setTag] = useState('')
-  const units = useMemo(() => allUnits.filter(unit => (!mine || boxIds.includes(unit.id)) && (!query || `${unit.id} ${unit.name}`.toLowerCase().includes(query.toLowerCase())) && (!type || unit.types.includes(type)) && (!unitClass || unit.classes.includes(unitClass)) && (!tag || unit.tags.includes(tag))).sort(byDescendingId), [mine, boxIds, query, type, unitClass, tag])
-  return <main className="page page-wide"><div className="page-heading"><div><p className="eyebrow">5 027 unités indexées</p><h1>Base de personnages</h1><p>Filtres en intersection, sans fiche détail.</p></div></div><Filters query={query} onQuery={setQuery} type={type} onType={setType} unitClass={unitClass} onClass={setUnitClass} tag={tag} onTag={setTag}><label className="mine-toggle"><input type="checkbox" checked={mine} onChange={event => setMine(event.target.checked)} /> Ma box</label></Filters><p className="result-count">{units.length} résultats</p><CharacterGrid units={units} /></main>
+  const [filters, setFilters] = useState<UnitFilters>(emptyFilters)
+  const units = useMemo(() => allUnits.filter(unit => (!mine || boxIds.includes(unit.id)) && matchesUnitFilters(unit, filters)).sort(byDescendingId), [mine, boxIds, filters])
+  return <main className="page page-wide"><div className="page-heading"><div><p className="eyebrow">5 027 unités indexées</p><h1>Base de personnages</h1><p>Filtres en intersection, sans fiche détail.</p></div></div><Filters filters={filters} onChange={patch => setFilters(current => ({ ...current, ...patch }))}><label className="mine-toggle"><input type="checkbox" checked={mine} onChange={event => setMine(event.target.checked)} /> Ma box</label></Filters><p className="result-count">{units.length} résultats</p><CharacterGrid units={units} counterEffect={filters.effect} /></main>
 }
 
-function Filters({ query, onQuery, type, onType, unitClass, onClass, tag, onTag, children }: { query: string; onQuery: (v: string) => void; type: string; onType: (v: string) => void; unitClass: string; onClass: (v: string) => void; tag: string; onTag: (v: string) => void; children?: React.ReactNode }) {
-  return <div className="filters"><label className="search-field"><Search size={16} /><input value={query} onChange={event => onQuery(event.target.value)} placeholder="Nom ou ID…" /></label><select aria-label="Type" value={type} onChange={event => onType(event.target.value)}><option value="">Tous les types</option>{data.filters.types.map(value => <option key={value}>{value}</option>)}</select><select aria-label="Classe" value={unitClass} onChange={event => onClass(event.target.value)}><option value="">Toutes les classes</option>{data.filters.classes.map(value => <option key={value}>{value}</option>)}</select><select aria-label="Tag" value={tag} onChange={event => onTag(event.target.value)}><option value="">Tous les tags</option>{data.filters.tags.map(value => <option key={value}>{value}</option>)}</select>{children}</div>
+function Filters({ filters, onChange, showEffect = true, children }: { filters: UnitFilters; onChange: (patch: Partial<UnitFilters>) => void; showEffect?: boolean; children?: React.ReactNode }) {
+  return <div className="filters"><label className="search-field"><Search size={16} /><input value={filters.query} onChange={event => onChange({ query: event.target.value })} placeholder="Nom ou ID…" /></label><select aria-label="Type" value={filters.type} onChange={event => onChange({ type: event.target.value })}><option value="">Tous les types</option>{data.filters.types.map(value => <option key={value}>{value}</option>)}</select><select aria-label="Classe" value={filters.unitClass} onChange={event => onChange({ unitClass: event.target.value })}><option value="">Toutes les classes</option>{data.filters.classes.map(value => <option key={value}>{value}</option>)}</select><select aria-label="Tag" value={filters.tag} onChange={event => onChange({ tag: event.target.value })}><option value="">Tous les tags</option>{data.filters.tags.map(value => <option key={value}>{value}</option>)}</select>{showEffect && <select aria-label="Effet ennemi" value={filters.effect} onChange={event => onChange({ effect: event.target.value })}><option value="">Tous les effets ennemis</option>{data.filters.effects.map(value => <option key={value}>{value}</option>)}</select>}{children}</div>
 }
 
-function CharacterGrid({ units, scores, beneficiaries, onSelect, action }: { units: Unit[]; scores?: Map<Id, number>; beneficiaries?: Set<Id>; onSelect?: (unit: Unit) => void; action?: (unit: Unit) => React.ReactNode }) {
-  return <div className="character-grid">{units.map(unit => <article key={unit.id} className={`unit-tile ${onSelect ? 'selectable' : ''} ${beneficiaries?.has(unit.id) ? 'beneficiary' : ''}`} onClick={() => onSelect?.(unit)}><div className="portrait-wrap"><img src={portrait(unit.id)} alt="" loading="lazy" width="72" height="72" />{scores?.get(unit.id) ? <span className="score">+{scores.get(unit.id)}</span> : null}{action?.(unit)}</div><div className="type-row">{unit.types.map(value => <span className={`type ${value}`} key={value}>{value}</span>)}</div><b title={unit.name}>{unit.name}</b><small>#{unit.id} · coût {unit.cost}</small></article>)}</div>
+const counterBadge = (counter: EnemyCounter) => `${counter.nature === 'ignore' ? 'ignore' : counter.complete ? 'réduit complètement' : counter.stacks != null ? `réduit ${counter.stacks} stack${counter.stacks === 1 ? '' : 's'}` : `réduit ${counter.turns} tour${counter.turns === 1 ? '' : 's'}`} · ${counter.source === 'captain' ? 'capitaine' : counter.source}`
+
+function CharacterGrid({ units, scores, beneficiaries, counterEffect, onSelect, action }: { units: Unit[]; scores?: Map<Id, number>; beneficiaries?: Set<Id>; counterEffect?: string; onSelect?: (unit: Unit) => void; action?: (unit: Unit) => React.ReactNode }) {
+  return <div className="character-grid">{units.map(unit => <article key={unit.id} className={`unit-tile ${onSelect ? 'selectable' : ''} ${beneficiaries?.has(unit.id) ? 'beneficiary' : ''}`} onClick={() => onSelect?.(unit)}><div className="portrait-wrap"><img src={portrait(unit.id)} alt="" loading="lazy" width="72" height="72" />{scores?.get(unit.id) ? <span className="score">+{scores.get(unit.id)}</span> : null}{action?.(unit)}</div><div className="type-row">{unit.types.map(value => <span className={`type ${value}`} key={value}>{value}</span>)}</div><b title={unit.name}>{unit.name}</b><small>#{unit.id} · coût {unit.cost}</small>{counterEffect && <div className="counter-badges">{unit.counters.filter(counter => counter.effect === counterEffect).map((counter, index) => <span className={`counter-badge ${counter.nature}`} key={`${counter.effect}-${counter.source}-${counter.turns ?? counter.stacks ?? 0}-${counter.complete ? 'complete' : ''}-${index}`}>{counterBadge(counter)}</span>)}</div>}</article>)}</div>
 }
 
 function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxIds: Id[]; cap: number; onBack: () => void; onChange: (team: Team) => void }) {
   const [activeSlot, setActiveSlot] = useState(0)
   const [supportFor, setSupportFor] = useState<number | null>(null)
-  const [query, setQuery] = useState('')
-  const [type, setType] = useState('')
-  const [unitClass, setUnitClass] = useState('')
-  const [tag, setTag] = useState('')
+  const [filters, setFilters] = useState<UnitFilters>(emptyFilters)
   const crew = team.slots.flatMap(id => id ? [data.units[id]] : [])
   const supports = team.type === 'pve' ? Object.values(team.supports).map(id => data.units[id]).filter(Boolean) : []
   const conditions = useMemo(() => team.type === 'pve' ? mergeConditions(crew) : mergeRumbleConditions(crew), [team, crew])
@@ -129,7 +128,7 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
   const checked = checkedEntries.filter(item => item.condition.negative || item.condition.comparator === 'exact' || !stateForEntry(item).done).map(item => item.condition)
   const currentCost = teamCost(team, data.units)
   const modifierBeneficiaries = new Set<Id>(team.type === 'pvp' ? boxIds.filter(id => team.modifiers.some(modifier => matchesModifier(data.units[id], modifier.targetKind, modifier.target))) : [])
-  const scored = boxIds.map(id => data.units[id]).filter(Boolean).filter(unit => !query || `${unit.id} ${unit.name}`.toLowerCase().includes(query.toLowerCase())).filter(unit => !type || unit.types.includes(type)).filter(unit => !unitClass || unit.classes.includes(unitClass)).filter(unit => !tag || unit.tags.includes(tag)).map(unit => ({ unit, ...candidateProgress(unit, crew, checked) })).filter(item => !item.violates && (!checked.some(condition => !condition.negative && !conditionState(condition, crew).done) || item.score > 0)).sort((a, b) => b.score - a.score || byDescendingId(a.unit, b.unit))
+  const scored = boxIds.map(id => data.units[id]).filter(Boolean).filter(unit => matchesUnitFilters(unit, filters)).map(unit => ({ unit, ...candidateProgress(unit, crew, checked) })).filter(item => !item.violates && (!checked.some(condition => !condition.negative && !conditionState(condition, crew).done) || item.score > 0)).sort((a, b) => b.score - a.score || byDescendingId(a.unit, b.unit))
   const scores = new Map(scored.map(item => [item.unit.id, item.score]))
 
   const select = (unit: Unit) => {
@@ -163,7 +162,7 @@ function TeamBuilder({ team, boxIds, cap, onBack, onChange }: { team: Team; boxI
         const state = item.condition.family === 'captain' ? { current: captainMatchesCarrier ? 1 : 0, target: 1, done: captainMatchesCarrier, label: captainMatchesCarrier ? '✓' : '✗' } : baseState
         return <label className={`condition ${state.done ? 'done' : ''} ${!item.condition.checkable ? 'raw' : ''}`} key={item.key}>{item.condition.checkable ? <input type="checkbox" checked={team.checkedConditions.includes(item.key)} onChange={() => toggleCondition(item.key)} /> : <span className="info-dot">i</span>}<span><small>{conditionSectionLabel(item.condition.section)} · {item.carriers.join(', ')}</small><b title={item.condition.original} aria-label={item.condition.original}>{conditionSummary(item.condition)}</b></span><em>{state.done ? <Check size={14} /> : state.label}</em></label>
       })}</div> : <Empty title="Aucune condition détectée" body="Ajoutez un porteur de condition à l’équipe pour alimenter ce panneau." />}{team.type === 'pvp' && <Modifiers team={team} onChange={onChange} />}</aside>
-      <section className="candidate-panel"><div className="candidate-title"><div><p className="panel-title">Candidats de ma box</p><h2>{supportFor !== null ? `Support pour ${data.units[team.slots[supportFor]!]?.name}` : `Slot ${activeSlot + 1}`}</h2></div>{checked.length > 0 && <span className="smart-chip">Recherche intelligente active</span>}</div><Filters query={query} onQuery={setQuery} type={type} onType={setType} unitClass={unitClass} onClass={setUnitClass} tag={tag} onTag={setTag} /><p className="result-count">{scored.length} candidats · le score indique les conditions progressées</p><CharacterGrid units={scored.map(item => item.unit)} scores={scores} beneficiaries={modifierBeneficiaries} onSelect={select} /></section>
+      <section className="candidate-panel"><div className="candidate-title"><div><p className="panel-title">Candidats de ma box</p><h2>{supportFor !== null ? `Support pour ${data.units[team.slots[supportFor]!]?.name}` : `Slot ${activeSlot + 1}`}</h2></div>{checked.length > 0 && <span className="smart-chip">Recherche intelligente active</span>}</div><Filters filters={filters} onChange={patch => setFilters(current => ({ ...current, ...patch }))} showEffect={team.type === 'pve'} /><p className="result-count">{scored.length} candidats · le score indique les conditions progressées</p><CharacterGrid units={scored.map(item => item.unit)} scores={scores} beneficiaries={modifierBeneficiaries} counterEffect={team.type === 'pve' ? filters.effect : ''} onSelect={select} /></section>
     </div>
     <TeamDock team={team} activeSlot={activeSlot} cap={cap} supportFor={supportFor} onSlot={index => { setActiveSlot(index); setSupportFor(null) }} onSupport={index => setSupportFor(supportFor === index ? null : index)} onChange={onChange} />
   </main>
